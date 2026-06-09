@@ -58,11 +58,22 @@ This document evolves at phase transitions and milestone boundaries.
 
 v1.0 is shipped as an architecture-and-workflow handoff milestone. Core module contracts, security/audit boundaries, lifecycle workflows, and AI governance paths are documented and archived under `.planning/milestones/v1.0-*`.
 
-## Next Milestone Goals
+## Current Milestone: v1.1 UI Rebuild
 
-- Convert approved architecture artifacts into implementation-ready v1.1 requirements and roadmap phases.
-- Prioritize backend and data persistence foundations (FastAPI + PostgreSQL) with production-grade authz/authn.
-- Implement AI-assisted flows with the human-governed controls defined in v1.0 artifacts.
+**Goal:** Rebuild the entire frontend inside `v0-ai-asset-management` in English, with mock data, aligned to the v1.0 architecture (modules, lifecycle states, roles, AI governance flows).
+
+**Target features:**
+- Login page with 4-role picker (Admin, Asset Manager, Staff, Auditor) in English
+- Dashboard overview (KPIs, asset-by-category chart, warranty alerts, high-risk panel)
+- Asset Registry (list, create/edit form, lifecycle state badges)
+- Assignment & Return workflow (request, approve, overdue, return, close)
+- Maintenance & Warranty screens (schedule view, warranty tracker)
+- AI Assistant panel (grounded query UI with mock trace/provenance)
+- OCR Invoice Intake UI (upload, confidence routing mockup, human-confirmation gate)
+- Predictive Maintenance UI (risk band cards, explainability mockup, approval flow)
+- Reporting screen (role-scoped overview)
+- Audit Log screen (read-only, Auditor role)
+- Sidebar/layout with correct English module labels and role-aware navigation
 
 **After each phase transition** (via `/gsd-transition`):
 1. Requirements invalidated? → Move to Out of Scope with reason
