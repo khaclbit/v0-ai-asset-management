@@ -1,6 +1,8 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { StoreProvider } from '@/lib/store'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -10,8 +12,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'AssetIQ — Quản lý tài sản doanh nghiệp với AI',
+  description:
+    'Hệ thống quản lý tài sản tích hợp AI: theo dõi laptop, màn hình, máy in, xe nâng và thiết bị văn phòng. Mượn/trả, khấu hao, trợ lý AI và trích xuất hóa đơn OCR.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -38,9 +41,12 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="vi" className={`${geistSans.variable} ${geistMono.variable} bg-background`}>
       <body className="font-sans antialiased">
-        {children}
+        <StoreProvider>
+          {children}
+          <Toaster position="top-center" />
+        </StoreProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

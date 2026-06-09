@@ -1,37 +1,180 @@
-export default function Page() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-6 text-neutral-400">
-      <div className="flex w-full max-w-md flex-col items-start gap-8">
-        <svg
-          fill="currentColor"
-          viewBox="0 0 147 70"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-          className="size-10 text-white"
-        >
-          <path d="M56 50.2031V14H70V60.1562C70 65.5928 65.5928 70 60.1562 70C57.5605 70 54.9982 68.9992 53.1562 67.1573L0 14H19.7969L56 50.2031Z" />
-          <path d="M147 56H133V23.9531L100.953 56H133V70H96.6875C85.8144 70 77 61.1856 77 50.3125V14H91V46.1562L123.156 14H91V0H127.312C138.186 0 147 8.81439 147 19.6875V56Z" />
-        </svg>
+"use client"
 
-        <div className="space-y-3">
-          <h1 className="text-balance text-2xl font-semibold tracking-tight text-white">
-            To get started, describe what you want to build.
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useStore } from "@/lib/store"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Boxes, ShieldCheck, User, ArrowRight } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+type Role = "Admin" | "Nhân viên"
+
+export default function LoginPage() {
+  const router = useRouter()
+  const { login } = useStore()
+  const [role, setRole] = useState<Role>("Admin")
+  const [email, setEmail] = useState("admin@company.vn")
+  const [password, setPassword] = useState("demo1234")
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    login(email, role)
+    router.push("/dashboard")
+  }
+
+  function pickRole(r: Role) {
+    setRole(r)
+    setEmail(r === "Admin" ? "admin@company.vn" : "nhanvien@company.vn")
+  }
+
+  return (
+    <main className="grid min-h-screen lg:grid-cols-2">
+      {/* Brand panel */}
+      <section className="relative hidden flex-col justify-between bg-sidebar p-12 text-sidebar-foreground lg:flex">
+        <div className="flex items-center gap-2">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <Boxes className="size-5" />
+          </div>
+          <span className="text-lg font-semibold tracking-tight">AssetIQ</span>
+        </div>
+
+        <div className="space-y-6">
+          <h1 className="text-balance text-4xl font-semibold leading-tight">
+            Quản lý tài sản doanh nghiệp, tăng tốc bằng AI.
           </h1>
-          <p className="text-pretty text-sm leading-relaxed text-neutral-500">
-            This is the default page for a fresh v0 project. Open the prompt and
-            tell v0 what to create, or browse the{' '}
-            <a
-              href="https://v0.app/templates"
-              target="_blank"
-              rel="noreferrer"
-              className="text-neutral-300 underline underline-offset-4 hover:text-white"
-            >
-              Community
-            </a>{' '}
-            for inspiration.
+          <p className="max-w-md text-pretty leading-relaxed text-sidebar-foreground/70">
+            Theo dõi laptop, màn hình, máy in, xe nâng và thiết bị văn phòng. Quản lý mượn/trả, khấu hao,
+            trợ lý hỏi đáp AI và trích xuất hóa đơn tự động bằng OCR.
+          </p>
+          <ul className="space-y-3 text-sm text-sidebar-foreground/80">
+            <li className="flex items-center gap-3">
+              <span className="flex size-6 items-center justify-center rounded-full bg-sidebar-accent">1</span>
+              CRUD tài sản đầy đủ — thêm, cập nhật, thanh lý
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="flex size-6 items-center justify-center rounded-full bg-sidebar-accent">2</span>
+              Báo cáo số lượng, giá trị và khấu hao
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="flex size-6 items-center justify-center rounded-full bg-sidebar-accent">3</span>
+              Trợ lý AI &amp; OCR hóa đơn
+            </li>
+          </ul>
+        </div>
+
+        <p className="text-xs text-sidebar-foreground/50">
+          Bản demo giao diện — dữ liệu là dữ liệu mẫu, không kết nối cơ sở dữ liệu thật.
+        </p>
+      </section>
+
+      {/* Login form */}
+      <section className="flex items-center justify-center bg-background px-6 py-12">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="space-y-2 lg:hidden">
+            <div className="flex items-center gap-2">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Boxes className="size-5" />
+              </div>
+              <span className="text-lg font-semibold tracking-tight">AssetIQ</span>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <h2 className="text-2xl font-semibold tracking-tight">Đăng nhập</h2>
+            <p className="text-sm text-muted-foreground">Chọn vai trò để trải nghiệm phân quyền.</p>
+          </div>
+
+          {/* Role selector */}
+          <div className="grid grid-cols-2 gap-3">
+            <RoleCard
+              active={role === "Admin"}
+              onClick={() => pickRole("Admin")}
+              icon={<ShieldCheck className="size-5" />}
+              title="Admin"
+              desc="Toàn quyền quản trị"
+            />
+            <RoleCard
+              active={role === "Nhân viên"}
+              onClick={() => pickRole("Nhân viên")}
+              icon={<User className="size-5" />}
+              title="Nhân viên"
+              desc="Mượn / trả tài sản"
+            />
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Mật khẩu</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full gap-2">
+              Đăng nhập với vai trò {role}
+              <ArrowRight className="size-4" />
+            </Button>
+          </form>
+
+          <p className="text-center text-xs text-muted-foreground">
+            Đây là tài khoản demo — bạn có thể đăng nhập trực tiếp.
           </p>
         </div>
-      </div>
+      </section>
     </main>
+  )
+}
+
+function RoleCard({
+  active,
+  onClick,
+  icon,
+  title,
+  desc,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  title: string
+  desc: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors",
+        active
+          ? "border-primary bg-accent ring-1 ring-primary"
+          : "border-border bg-card hover:bg-accent/50",
+      )}
+    >
+      <span
+        className={cn(
+          "flex size-9 items-center justify-center rounded-md",
+          active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+        )}
+      >
+        {icon}
+      </span>
+      <span className="text-sm font-medium">{title}</span>
+      <span className="text-xs text-muted-foreground">{desc}</span>
+    </button>
   )
 }
