@@ -9,7 +9,7 @@ This milestone delivers architecture-first artifacts only: system blueprint, mod
 - [x] **Phase 1: Architecture Foundation & Module Contracts** - Define the target system blueprint, module boundaries, and inter-module contracts.
 - [x] **Phase 2: Data Model, Security Boundaries & Audit Design** - Define core domain model plus RBAC and auditability architecture.
 - [x] **Phase 3: Core Asset Lifecycle Workflow Design** - Define end-to-end lifecycle workflows and transition logic.
-- [ ] **Phase 4: AI Integration Flows & Human-Governed Decision Paths** - Define assistant/OCR/predictive workflows with confidence and approval gates.
+- [x] **Phase 4: AI Integration Flows & Human-Governed Decision Paths** - Define assistant/OCR/predictive workflows with confidence and approval gates.
 
 ## Phase Details
 
@@ -58,7 +58,7 @@ This milestone delivers architecture-first artifacts only: system blueprint, mod
   1. Engineering team can review assistant query flow from natural-language input to grounded data response.
   2. Engineering team can review OCR-assisted ingestion flow with human confirmation and error-handling path.
   3. Engineering team can review predictive maintenance flow with confidence handling and explicit human decision checkpoint.
-**Plans**: TBD  
+**Plans**: 1  
 **UI hint**: yes
 
 ## Progress
@@ -68,4 +68,4 @@ This milestone delivers architecture-first artifacts only: system blueprint, mod
 | 1. Architecture Foundation & Module Contracts | 1/1 | Complete | 2026-06-09 |
 | 2. Data Model, Security Boundaries & Audit Design | 2/2 | Complete | 2026-06-09 |
 | 3. Core Asset Lifecycle Workflow Design | 1/1 | Complete | 2026-06-09 |
-| 4. AI Integration Flows & Human-Governed Decision Paths | 0/TBD | Not started | - |
+| 4. AI Integration Flows & Human-Governed Decision Paths | 1/1 | Complete | 2026-06-09 |

@@ -25,9 +25,9 @@
 
 ### AI Integration Boundaries
 
-- [ ] **AINT-01**: Engineering team can view assistant query workflow from natural language input to grounded data response
-- [ ] **AINT-02**: Engineering team can view OCR-assisted ingestion workflow with human confirmation and error handling path
-- [ ] **AINT-03**: Engineering team can view predictive maintenance workflow with confidence handling and human decision checkpoint
+- [x] **AINT-01**: Engineering team can view assistant query workflow from natural language input to grounded data response
+- [x] **AINT-02**: Engineering team can view OCR-assisted ingestion workflow with human confirmation and error handling path
+- [x] **AINT-03**: Engineering team can view predictive maintenance workflow with confidence handling and human decision checkpoint
 
 ## v2 Requirements
 
@@ -58,9 +58,9 @@
 | FLOW-01 | Phase 3 | Complete |
 | FLOW-02 | Phase 3 | Complete |
 | FLOW-03 | Phase 3 | Complete |
-| AINT-01 | Phase 4 | Pending |
-| AINT-02 | Phase 4 | Pending |
-| AINT-03 | Phase 4 | Pending |
+| AINT-01 | Phase 4 | Complete |
+| AINT-02 | Phase 4 | Complete |
+| AINT-03 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 12 total
