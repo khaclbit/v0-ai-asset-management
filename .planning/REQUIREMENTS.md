@@ -52,9 +52,9 @@
 | ARCH-01 | Phase 1 | Complete |
 | ARCH-02 | Phase 1 | Complete |
 | ARCH-03 | Phase 1 | Complete |
-| DATA-01 | Phase 2 | Pending |
-| SECU-01 | Phase 2 | Pending |
-| SECU-02 | Phase 2 | Pending |
+| DATA-01 | Phase 2 | Complete |
+| SECU-01 | Phase 2 | Complete |
+| SECU-02 | Phase 2 | Complete |
 | FLOW-01 | Phase 3 | Pending |
 | FLOW-02 | Phase 3 | Pending |
 | FLOW-03 | Phase 3 | Pending |
