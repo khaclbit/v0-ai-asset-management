@@ -32,6 +32,17 @@ AI-Powered Asset Management System provides architecture governance for asset li
 | PostgreSQL | System-of-record data and audit persistence | SQL | Enforced through backend ownership |
 | Event/Async Worker Plane | OCR/predictive and notification async flows | Event contracts | Async only where needed |
 
+## Normalized Module Naming (Cross-Artifact Alignment)
+
+These module names are canonical across all Phase 1 artifacts:
+
+- Identity & Access
+- Asset Lifecycle
+- Maintenance & Warranty
+- Reporting & Insights
+- AI Orchestration
+- Audit & Compliance
+
 ## Interaction Principles
 
 1. Backend owns business truth and authorization.
@@ -39,3 +50,8 @@ AI-Powered Asset Management System provides architecture governance for asset li
 3. Async integration paths are explicit for OCR/predictive/background workflows.
 4. C4 naming and structure is used consistently across artifacts.
 
+## ADR References
+
+- ADR-01 (domain-based module structure)
+- ADR-02 (strict ownership boundaries)
+- ADR-04 (sync-first with explicit async paths)

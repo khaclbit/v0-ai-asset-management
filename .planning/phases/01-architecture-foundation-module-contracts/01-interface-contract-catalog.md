@@ -38,3 +38,8 @@
 | ARCH-02 | Owner/consumer assignments and module responsibility separation |
 | ARCH-03 | Versioned request/response schemas and explicit error semantics |
 
+## ADR References
+
+- ADR-02 (strict ownership boundaries)
+- ADR-03 (versioned contract catalog)
+- ADR-04 (sync-first with explicit async contracts)

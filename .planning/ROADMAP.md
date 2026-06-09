@@ -6,7 +6,7 @@ This milestone delivers architecture-first artifacts only: system blueprint, mod
 
 ## Phases
 
-- [ ] **Phase 1: Architecture Foundation & Module Contracts** - Define the target system blueprint, module boundaries, and inter-module contracts.
+- [x] **Phase 1: Architecture Foundation & Module Contracts** - Define the target system blueprint, module boundaries, and inter-module contracts.
 - [ ] **Phase 2: Data Model, Security Boundaries & Audit Design** - Define core domain model plus RBAC and auditability architecture.
 - [ ] **Phase 3: Core Asset Lifecycle Workflow Design** - Define end-to-end lifecycle workflows and transition logic.
 - [ ] **Phase 4: AI Integration Flows & Human-Governed Decision Paths** - Define assistant/OCR/predictive workflows with confidence and approval gates.
@@ -22,7 +22,7 @@ This milestone delivers architecture-first artifacts only: system blueprint, mod
   1. Engineering team can review one system context diagram that shows frontend, backend, data, AI, and external integration boundaries.
   2. Engineering team can identify module-level responsibilities and ownership boundaries across all core domains.
   3. Engineering team can review interface contracts between modules with clear inputs, outputs, and responsibility boundaries.
-**Plans**: TBD  
+**Plans**: 1  
 **UI hint**: yes
 
 ### Phase 2: Data Model, Security Boundaries & Audit Design
@@ -65,7 +65,7 @@ This milestone delivers architecture-first artifacts only: system blueprint, mod
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Architecture Foundation & Module Contracts | 0/TBD | Not started | - |
+| 1. Architecture Foundation & Module Contracts | 1/1 | Complete | 2026-06-09 |
 | 2. Data Model, Security Boundaries & Audit Design | 0/TBD | Not started | - |
 | 3. Core Asset Lifecycle Workflow Design | 0/TBD | Not started | - |
 | 4. AI Integration Flows & Human-Governed Decision Paths | 0/TBD | Not started | - |

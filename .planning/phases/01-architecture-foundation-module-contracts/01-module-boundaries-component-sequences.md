@@ -49,3 +49,21 @@
 4. Worker processes OCR and returns candidate extraction.
 5. Backend presents human confirmation step before final registration.
 
+## Interaction-to-Contract Traceability
+
+| Interaction | Contract |
+|---|---|
+| Asset registration | `POST /assets` |
+| Assignment flow | `POST /assignments` |
+| Return flow | `POST /returns` |
+| Reporting query | `GET /reports/overview` |
+| Assistant query | `POST /assistant/query` |
+| OCR async request | `ocr.intake.requested` |
+| OCR async completion | `ocr.intake.completed` |
+| Predictive scoring event | `maintenance.risk.scored` |
+
+## ADR References
+
+- ADR-01 (domain-based modules)
+- ADR-02 (ownership and forbidden dependencies)
+- ADR-04 (sync/async interaction strategy)
