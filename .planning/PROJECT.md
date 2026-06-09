@@ -15,12 +15,15 @@ Give teams a clear, implementation-ready system architecture and workflow bluepr
 - ✓ Existing web dashboard supports role-aware login gating and routed dashboard navigation — existing
 - ✓ Existing frontend supports asset CRUD, borrow/return tracking, and reporting views in a demo flow — existing
 - ✓ Existing frontend includes assistant-style natural-language query simulation and OCR-assisted asset intake simulation — existing
+- ✓ Produced architecture blueprint, module boundaries, and interface contracts — v1.0
+- ✓ Produced data model, security boundary, and audit traceability architecture — v1.0
+- ✓ Produced lifecycle workflows and AI integration governance workflows — v1.0
 
 ### Active
 
-- [ ] Produce a production-target architecture blueprint (frontend, backend, data, AI integration boundaries)
-- [ ] Define module-level responsibilities and interfaces for engineering implementation handoff
-- [ ] Define end-to-end business and technical workflows for asset lifecycle and AI-assisted operations
+- [ ] Define v1.1 implementation milestone requirements for backend services and persistence
+- [ ] Define v1.1 delivery scope for production authentication/authorization integration
+- [ ] Define v1.1 implementation scope for operationalizing assistant/OCR/predictive flows
 
 ### Out of Scope
 
@@ -51,6 +54,16 @@ The current repository includes a mapped brownfield frontend prototype (`v0-ai-a
 
 This document evolves at phase transitions and milestone boundaries.
 
+## Current State
+
+v1.0 is shipped as an architecture-and-workflow handoff milestone. Core module contracts, security/audit boundaries, lifecycle workflows, and AI governance paths are documented and archived under `.planning/milestones/v1.0-*`.
+
+## Next Milestone Goals
+
+- Convert approved architecture artifacts into implementation-ready v1.1 requirements and roadmap phases.
+- Prioritize backend and data persistence foundations (FastAPI + PostgreSQL) with production-grade authz/authn.
+- Implement AI-assisted flows with the human-governed controls defined in v1.0 artifacts.
+
 **After each phase transition** (via `/gsd-transition`):
 1. Requirements invalidated? → Move to Out of Scope with reason
 2. Requirements validated? → Move to Validated with phase reference
@@ -65,4 +78,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-09 after initialization*
+*Last updated: 2026-06-09 after v1.0 milestone completion*
