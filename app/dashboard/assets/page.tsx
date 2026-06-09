@@ -20,7 +20,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select"
 import {
   DropdownMenu,
@@ -108,7 +107,7 @@ export default function AssetsPage() {
           </div>
           <Select value={category} onValueChange={setCategory}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Loại tài sản" />
+              <span>{category === "all" ? "Tất cả loại" : category}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Tất cả loại</SelectItem>
