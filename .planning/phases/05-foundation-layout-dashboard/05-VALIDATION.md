@@ -1,43 +1,41 @@
 ---
 phase: 5
 slug: foundation-layout-dashboard
-status: partial
-nyquist_compliant: false
+status: verified
+nyquist_compliant: true
 wave_0_complete: true
 updated: 2026-06-10
 ---
 
 # Phase 5 — Validation Strategy
 
-> Validation map updated after execution of plans 05-02 and 05-03.
+> Nyquist validation finalized after 05-02/05-03 execution and 05 UAT completion.
 
 ## Test Infrastructure
 
 | Property | Value |
 |----------|-------|
-| **Framework** | Vitest + TypeScript (`vitest run`, `tsc --noEmit`) |
+| **Framework** | Vitest + TypeScript + conversational UAT |
 | **Primary command** | `cd v0-ai-asset-management && npm run test -- lib/dashboard-kpis.test.ts app/dashboard/page.test.tsx` |
 | **Secondary command** | `cd v0-ai-asset-management && npx tsc --noEmit` |
-| **Evidence source** | 05-02 execution outputs + source/test artifacts |
+| **UAT artifact** | `.planning/phases/05-foundation-layout-dashboard/05-UAT.md` (4/4 pass) |
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Requirement(s) | Test Type | Automated Command | File Exists | Status |
-|---------|------|----------------|-----------|-------------------|-------------|--------|
-| 05-02-01 | 02 | DASH-01 | unit | `cd v0-ai-asset-management && npm run test -- lib/dashboard-kpis.test.ts` | ✅ | ✅ |
-| 05-02-02 | 02 | DASH-01, DASH-03 | component + type | `cd v0-ai-asset-management && npm run test -- lib/dashboard-kpis.test.ts app/dashboard/page.test.tsx && npx tsc --noEmit` | ✅ | ✅ |
-| 05-03-01 | 03 | FNDN-01, FNDN-02, FNDN-05, DASH-01..05 | artifact consistency | `grep` checks in `05-03-PLAN.md` verification section | ✅ | ✅ |
-| 05-03-02 | 03 | DASH-01 | verification artifact sync | `grep` checks in `05-03-PLAN.md` verification section | ✅ | ✅ |
-
-## Wave 0 Assessment
-
-Wave 0 closure for DASH-01 is now automated and reproducible, but full Nyquist closure for all historical Phase 5 tasks remains partial due legacy evidence-only rows from original 05-01 execution.
+| Task ID | Plan | Requirement(s) | Test Type | Command / Artifact | Status |
+|---------|------|----------------|-----------|--------------------|--------|
+| 05-01-base | 01 | FNDN-01..06, DASH-02..05 | conversational UAT | `05-UAT.md` tests #1, #2, #4 | ✅ |
+| 05-02-01 | 02 | DASH-01 | unit | `npm run test -- lib/dashboard-kpis.test.ts` | ✅ |
+| 05-02-02 | 02 | DASH-01, DASH-03 | component + type | `npm run test -- lib/dashboard-kpis.test.ts app/dashboard/page.test.tsx && npx tsc --noEmit` | ✅ |
+| 05-03-01 | 03 | FNDN-01, FNDN-02, FNDN-05, DASH-01..05 | artifact consistency | `grep` assertions in `05-03-PLAN.md` verification block | ✅ |
+| 05-03-02 | 03 | DASH-01 | verification narrative sync | `05-VERIFICATION.md` + `05-SECURITY.md` | ✅ |
 
 ## Validation Sign-Off
 
-- [x] 05-02 regression tests added and passing (`dashboard-kpis.test.ts`, `dashboard/page.test.tsx`)
-- [x] Type-check command passes after KPI-contract refactor
-- [x] Verification and requirements trackers synchronized in 05-03
-- [x] `nyquist_compliant: false` retained truthfully for legacy non-replayed tasks
+- [x] Dashboard KPI contract has automated regression coverage
+- [x] Dashboard/page targeted tests pass
+- [x] Phase 5 UAT passed (4/4)
+- [x] Requirement tracker + roadmap + verification/security artifacts are consistent
+- [x] `nyquist_compliant: true` justified by automated + UAT coverage for all Phase 5 requirements
 
-**Approval:** partial (Phase 5 gap closure complete; full historical Nyquist replay still outstanding)
+**Approval:** verified
