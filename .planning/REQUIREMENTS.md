@@ -75,10 +75,10 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 ### Reporting
 
-- [ ] **RPT-01**: User can view an asset overview report: count by category, count by lifecycle state
-- [ ] **RPT-02**: User can view an assignment report: active/historical assignments
-- [ ] **RPT-03**: User can view a maintenance schedule report: upcoming and overdue items
-- [ ] **RPT-04**: Staff user sees a scoped view of their own assignments only (role-filtered)
+- [x] **RPT-01**: User can view an asset overview report: count by category, count by lifecycle state
+- [x] **RPT-02**: User can view an assignment report: active/historical assignments
+- [x] **RPT-03**: User can view a maintenance schedule report: upcoming and overdue items
+- [x] **RPT-04**: Staff user sees a scoped view of their own assignments only (role-filtered)
 
 ### Audit Log
 
@@ -160,10 +160,10 @@ Deferred to a future milestone.
 | PRED-03 | Phase 9 | Complete |
 | PRED-04 | Phase 9 | Complete |
 | PRED-05 | Phase 9 | Complete |
-| RPT-01 | Phase 10 | Pending |
-| RPT-02 | Phase 10 | Pending |
-| RPT-03 | Phase 10 | Pending |
-| RPT-04 | Phase 10 | Pending |
+| RPT-01 | Phase 10 | Complete |
+| RPT-02 | Phase 10 | Complete |
+| RPT-03 | Phase 10 | Complete |
+| RPT-04 | Phase 10 | Complete |
 | AUDT-01 | Phase 10 | Pending |
 | AUDT-02 | Phase 10 | Pending |
 | AUDT-03 | Phase 10 | Pending |

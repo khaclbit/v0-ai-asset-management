@@ -33,7 +33,7 @@
 | 7 | Assignment & Return Workflow UI | Users can create assignment requests, approve/reject them, track status badges, and close returns | ASGN-01–06 | 5 |
 | 8 | Maintenance & Warranty UI | 2/2 | Complete    | 2026-06-10 |
 | 9 | AI Governance UIs | Users can query the AI assistant, run OCR intake with confidence routing, and review predictive risk recommendations | AIST-01–04, OCR-01–06, PRED-01–05 | 5 |
-| 10 | Reporting & Audit Log UI | Users can view role-scoped reports and Admins/Auditors can read the immutable audit event log | RPT-01–04, AUDT-01–03 | 4 |
+| 10 | Reporting & Audit Log UI | 1/3 | In Progress|  |
 | 11 | Navigation & Access Control Gap Closure | 2/2 | Complete   | 2026-06-10 |
 | 12 | Assignment Approval Integrity Gap Closure | 1/1 | Complete   | 2026-06-10 |
 | 13 | Verification & Validation Artifact Backfill | 2/2 | Complete   | 2026-06-10 |
@@ -124,7 +124,11 @@ Plans:
   2. A Staff user viewing reports sees only their own assignments — not the full organizational data visible to Admin/Asset Manager
   3. Audit Log page (Admin/Auditor only) shows a table of immutable events with columns: actor, action, entity, before/after state, timestamp, and correlation_id
   4. Audit log supports category filtering (Business, Security, AI-assisted) and clicking a row expands full event details including any AI recommendation linkage
-**Plans:** TBD
+**Plans:** 1/3 plans executed
+Plans:
+- [x] 10-01-PLAN.md — Reporting selectors + full reports UI coverage and staff scoping
+- [ ] 10-02-PLAN.md — Immutable audit event contract + read-only dataset selectors
+- [ ] 10-03-PLAN.md — Audit table UI with category filter and expandable details
 **UI hint**: yes
 
 ### Phase 11: Navigation & Access Control Gap Closure
@@ -174,7 +178,7 @@ Plans:
 | 7. Assignment & Return Workflow UI | 0/? | Not started | - |
 | 8. Maintenance & Warranty UI | 0/? | Not started | - |
 | 9. AI Governance UIs | 3/3 | Complete | 2026-06-10 |
-| 10. Reporting & Audit Log UI | 3/3 | Planned | - |
+| 10. Reporting & Audit Log UI | 1/3 | In progress | - |
 | 11. Navigation & Access Control Gap Closure | 2/2 | Complete | 2026-06-10 |
 | 12. Assignment Approval Integrity Gap Closure | 0/? | Not started | - |
 | 13. Verification & Validation Artifact Backfill | 2/2 | Complete | 2026-06-10 |
