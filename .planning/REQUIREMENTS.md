@@ -36,7 +36,7 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 ### Assignment & Return Workflow
 
 - [ ] **ASGN-01**: Staff/Asset Manager can create an assignment request form (asset, assignee, expected return date)
-- [ ] **ASGN-02**: Asset Manager can approve or reject a pending assignment request
+- [x] **ASGN-02**: Asset Manager can approve or reject a pending assignment request
 - [ ] **ASGN-03**: User sees assignment state badges: requested, active, overdue, closed, rejected
 - [ ] **ASGN-04**: Asset Manager/Staff can initiate a return from an active assignment
 - [ ] **ASGN-05**: Asset Manager can validate and close a return (close assignment)
@@ -136,7 +136,7 @@ Deferred to a future milestone.
 | ASSET-05 | Phase 6 | Complete |
 | ASSET-06 | Phase 6 | Complete |
 | ASGN-01 | Phase 7 | Pending |
-| ASGN-02 | Phase 12 | Pending |
+| ASGN-02 | Phase 12 | Complete |
 | ASGN-03 | Phase 7 | Pending |
 | ASGN-04 | Phase 7 | Pending |
 | ASGN-05 | Phase 7 | Pending |

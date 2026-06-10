@@ -21,7 +21,7 @@
 - [x] **Phase 9: AI Governance UIs** — AI assistant panel, OCR intake with confidence routing, predictive maintenance risk cards and escalation (completed 2026-06-10)
 - [ ] **Phase 10: Reporting & Audit Log UI** — Role-scoped report views and immutable audit event log with filtering
 - [x] **Phase 11: Navigation & Access Control Gap Closure** — Fix broken audit navigation target and enforce route-level RBAC for restricted modules (completed 2026-06-10)
-- [ ] **Phase 12: Assignment Approval Integrity Gap Closure** — Fix assignment approval side-effect desynchronization in conflict paths
+- [x] **Phase 12: Assignment Approval Integrity Gap Closure** — Fix assignment approval side-effect desynchronization in conflict paths (completed 2026-06-10)
 - [ ] **Phase 13: Verification & Validation Artifact Backfill** — Add missing verification/validation artifacts for Phases 5, 8, and 9
 
 ## Summary
@@ -35,7 +35,7 @@
 | 9 | AI Governance UIs | Users can query the AI assistant, run OCR intake with confidence routing, and review predictive risk recommendations | AIST-01–04, OCR-01–06, PRED-01–05 | 5 |
 | 10 | Reporting & Audit Log UI | Users can view role-scoped reports and Admins/Auditors can read the immutable audit event log | RPT-01–04, AUDT-01–03 | 4 |
 | 11 | Navigation & Access Control Gap Closure | 2/2 | Complete   | 2026-06-10 |
-| 12 | Assignment Approval Integrity Gap Closure | Ensure assignment approval mutates assignment and asset state atomically without conflict desync | ASGN-02 | 2 |
+| 12 | Assignment Approval Integrity Gap Closure | 1/1 | Complete   | 2026-06-10 |
 | 13 | Verification & Validation Artifact Backfill | Backfill missing verification/validation artifacts required for milestone completion gates | N/A (artifact gate) | 3 |
 
 ## Phase Details
@@ -143,7 +143,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Conflicting approval paths do not mutate asset assignment side effects when assignment state remains unapproved
   2. Successful approvals still transition assignment to active and sync asset status/assignee correctly
-**Plans:** TBD
+**Plans:** 1/1 plans complete
 **UI hint**: no
 
 ### Phase 13: Verification & Validation Artifact Backfill
