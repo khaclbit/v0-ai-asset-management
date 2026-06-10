@@ -82,9 +82,9 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 ### Audit Log
 
-- [ ] **AUDT-01**: Admin/Auditor can view an immutable audit event log with: actor, action, entity, before/after state, timestamp, correlation_id
-- [ ] **AUDT-02**: User can filter audit events by category: Business, Security, AI-assisted
-- [ ] **AUDT-03**: User can expand an audit event row to see full event details including AI recommendation linkage
+- [x] **AUDT-01**: Admin/Auditor can view an immutable audit event log with: actor, action, entity, before/after state, timestamp, correlation_id
+- [x] **AUDT-02**: User can filter audit events by category: Business, Security, AI-assisted
+- [x] **AUDT-03**: User can expand an audit event row to see full event details including AI recommendation linkage
 
 ## v2 Requirements
 
@@ -164,9 +164,9 @@ Deferred to a future milestone.
 | RPT-02 | Phase 10 | Complete |
 | RPT-03 | Phase 10 | Complete |
 | RPT-04 | Phase 10 | Complete |
-| AUDT-01 | Phase 10 | Pending |
-| AUDT-02 | Phase 10 | Pending |
-| AUDT-03 | Phase 10 | Pending |
+| AUDT-01 | Phase 10 | Complete |
+| AUDT-02 | Phase 10 | Complete |
+| AUDT-03 | Phase 10 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 47 total
