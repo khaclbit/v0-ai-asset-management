@@ -18,7 +18,7 @@
 - [x] **Phase 6: Asset Registry UI** — Paginated asset list, create/edit forms, lifecycle state badges, filter and search (completed 2026-06-10)
 - [ ] **Phase 7: Assignment & Return Workflow UI** — Request form, approval flow, status badges, return initiation, and close flow
 - [x] **Phase 8: Maintenance & Warranty UI** — Maintenance schedule list, state update form, warranty tracker, expiry warnings (completed 2026-06-10)
-- [ ] **Phase 9: AI Governance UIs** — AI assistant panel, OCR intake with confidence routing, predictive maintenance risk cards and escalation
+- [x] **Phase 9: AI Governance UIs** — AI assistant panel, OCR intake with confidence routing, predictive maintenance risk cards and escalation (completed 2026-06-10)
 - [ ] **Phase 10: Reporting & Audit Log UI** — Role-scoped report views and immutable audit event log with filtering
 
 ## Summary
@@ -98,7 +98,11 @@ Plans:
   3. Confidence routing displays the correct review form: High → quick-confirm pre-filled form, Medium → field-by-field review form, Low → rejection message with rescan prompt; Submit button is disabled until all mandatory fields (Name, Category, Serial, Purchase Date, Vendor, Price) are confirmed
   4. Predictive Maintenance page lists AI-generated recommendations with risk band badges (High, Medium, Low); each card shows risk band, confidence score, top contributing factors, and correlation_id
   5. Asset Manager can approve or defer a High-risk recommendation (mock action); High-risk items show an SLA countdown and items past deadline show an escalation notice
-**Plans:** TBD
+**Plans:** 3/3 plans complete
+Plans:
+- [x] 09-01-PLAN.md — Assistant governance response contract + collapsed trace panel
+- [x] 09-02-PLAN.md — OCR confidence routing + hierarchy/provenance alignment
+- [x] 09-03-PLAN.md — Predictive recommendations + role-gated escalation actions
 **UI hint**: yes
 
 ### Phase 10: Reporting & Audit Log UI
@@ -121,7 +125,7 @@ Plans:
 | 6. Asset Registry UI | 0/? | Not started | - |
 | 7. Assignment & Return Workflow UI | 0/? | Not started | - |
 | 8. Maintenance & Warranty UI | 0/? | Not started | - |
-| 9. AI Governance UIs | 0/? | Not started | - |
+| 9. AI Governance UIs | 3/3 | Complete | 2026-06-10 |
 | 10. Reporting & Audit Log UI | 0/? | Not started | - |
 
 ## Coverage

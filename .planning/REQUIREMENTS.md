@@ -67,11 +67,11 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 ### Predictive Maintenance
 
-- [ ] **PRED-01**: User sees a list of AI-generated predictive maintenance recommendations with risk band badges (High, Medium, Low)
-- [ ] **PRED-02**: Each recommendation card shows: risk band, confidence score, top contributing factors, correlation_id
-- [ ] **PRED-03**: Asset Manager can approve or defer a High-risk recommendation (mock action)
-- [ ] **PRED-04**: User sees a mock SLA countdown for unresolved High-risk items
-- [ ] **PRED-05**: User sees an escalation notice for items past SLA deadline
+- [x] **PRED-01**: User sees a list of AI-generated predictive maintenance recommendations with risk band badges (High, Medium, Low)
+- [x] **PRED-02**: Each recommendation card shows: risk band, confidence score, top contributing factors, correlation_id
+- [x] **PRED-03**: Asset Manager can approve or defer a High-risk recommendation (mock action)
+- [x] **PRED-04**: User sees a mock SLA countdown for unresolved High-risk items
+- [x] **PRED-05**: User sees an escalation notice for items past SLA deadline
 
 ### Reporting
 
@@ -155,11 +155,11 @@ Deferred to a future milestone.
 | OCR-04 | Phase 9 | Complete |
 | OCR-05 | Phase 9 | Complete |
 | OCR-06 | Phase 9 | Complete |
-| PRED-01 | Phase 9 | Pending |
-| PRED-02 | Phase 9 | Pending |
-| PRED-03 | Phase 9 | Pending |
-| PRED-04 | Phase 9 | Pending |
-| PRED-05 | Phase 9 | Pending |
+| PRED-01 | Phase 9 | Complete |
+| PRED-02 | Phase 9 | Complete |
+| PRED-03 | Phase 9 | Complete |
+| PRED-04 | Phase 9 | Complete |
+| PRED-05 | Phase 9 | Complete |
 | RPT-01 | Phase 10 | Pending |
 | RPT-02 | Phase 10 | Pending |
 | RPT-03 | Phase 10 | Pending |
