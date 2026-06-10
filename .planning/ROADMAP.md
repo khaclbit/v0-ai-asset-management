@@ -9,7 +9,7 @@
 ## Milestone v1.1: UI Rebuild
 
 **Goal:** Rebuild the entire frontend in English with mock data, aligned to v1.0 architecture modules, lifecycle states, roles, and AI governance flows.
-**Phases:** 6 (Phase 5–10)
+**Phases:** 9 (Phase 5–13)
 **Requirements mapped:** 47
 
 ## Phases
@@ -20,6 +20,9 @@
 - [x] **Phase 8: Maintenance & Warranty UI** — Maintenance schedule list, state update form, warranty tracker, expiry warnings (completed 2026-06-10)
 - [x] **Phase 9: AI Governance UIs** — AI assistant panel, OCR intake with confidence routing, predictive maintenance risk cards and escalation (completed 2026-06-10)
 - [ ] **Phase 10: Reporting & Audit Log UI** — Role-scoped report views and immutable audit event log with filtering
+- [ ] **Phase 11: Navigation & Access Control Gap Closure** — Fix broken audit navigation target and enforce route-level RBAC for restricted modules
+- [ ] **Phase 12: Assignment Approval Integrity Gap Closure** — Fix assignment approval side-effect desynchronization in conflict paths
+- [ ] **Phase 13: Verification & Validation Artifact Backfill** — Add missing verification/validation artifacts for Phases 5, 8, and 9
 
 ## Summary
 
@@ -31,6 +34,9 @@
 | 8 | Maintenance & Warranty UI | 2/2 | Complete    | 2026-06-10 |
 | 9 | AI Governance UIs | Users can query the AI assistant, run OCR intake with confidence routing, and review predictive risk recommendations | AIST-01–04, OCR-01–06, PRED-01–05 | 5 |
 | 10 | Reporting & Audit Log UI | Users can view role-scoped reports and Admins/Auditors can read the immutable audit event log | RPT-01–04, AUDT-01–03 | 4 |
+| 11 | Navigation & Access Control Gap Closure | Close navigation and RBAC integration gaps identified in milestone audit | FNDN-03, FNDN-04, FNDN-06 | 3 |
+| 12 | Assignment Approval Integrity Gap Closure | Ensure assignment approval mutates assignment and asset state atomically without conflict desync | ASGN-02 | 2 |
+| 13 | Verification & Validation Artifact Backfill | Backfill missing verification/validation artifacts required for milestone completion gates | N/A (artifact gate) | 3 |
 
 ## Phase Details
 
@@ -117,6 +123,41 @@ Plans:
 **Plans:** TBD
 **UI hint**: yes
 
+### Phase 11: Navigation & Access Control Gap Closure
+**Goal:** Restore valid dashboard navigation targets and enforce route-level role access controls so restricted modules cannot be accessed through direct URL bypass.
+**Depends on:** Phase 10
+**Requirements:** FNDN-03, FNDN-04, FNDN-06
+**Gap Closure:** Closes milestone audit integration/flow gaps for broken audit navigation and route-level RBAC bypass.
+**Success Criteria** (what must be TRUE):
+  1. Sidebar links only point to existing dashboard routes (no 404 for audit navigation)
+  2. Route-level guards deny unauthorized roles from accessing restricted pages via direct URL
+  3. Login/logout and role-appropriate navigation behavior remain intact after access-control changes
+**Plans:** TBD
+**UI hint**: yes
+
+### Phase 12: Assignment Approval Integrity Gap Closure
+**Goal:** Ensure assignment approval logic updates assignment and related asset state atomically and only when approval actually succeeds.
+**Depends on:** Phase 11
+**Requirements:** ASGN-02
+**Gap Closure:** Closes milestone audit integration/flow gap for assignment approval conflict desynchronization.
+**Success Criteria** (what must be TRUE):
+  1. Conflicting approval paths do not mutate asset assignment side effects when assignment state remains unapproved
+  2. Successful approvals still transition assignment to active and sync asset status/assignee correctly
+**Plans:** TBD
+**UI hint**: no
+
+### Phase 13: Verification & Validation Artifact Backfill
+**Goal:** Backfill milestone gating artifacts so all completed v1.1 phases have required verification and Nyquist validation coverage records.
+**Depends on:** Phase 12
+**Requirements:** N/A (artifact backfill phase)
+**Gap Closure:** Closes milestone audit gaps for missing phase-level verification/validation artifacts.
+**Success Criteria** (what must be TRUE):
+  1. Phase 5 and Phase 9 each have a current VERIFICATION.md with explicit requirement coverage and evidence
+  2. Missing VALIDATION.md artifacts for audited phases are created or updated with Nyquist status and per-task mapping
+  3. Milestone re-audit no longer reports missing verification/validation artifacts for Phases 5, 8, and 9
+**Plans:** TBD
+**UI hint**: no
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -127,6 +168,9 @@ Plans:
 | 8. Maintenance & Warranty UI | 0/? | Not started | - |
 | 9. AI Governance UIs | 3/3 | Complete | 2026-06-10 |
 | 10. Reporting & Audit Log UI | 0/? | Not started | - |
+| 11. Navigation & Access Control Gap Closure | 0/? | Not started | - |
+| 12. Assignment Approval Integrity Gap Closure | 0/? | Not started | - |
+| 13. Verification & Validation Artifact Backfill | 0/? | Not started | - |
 
 ## Coverage
 

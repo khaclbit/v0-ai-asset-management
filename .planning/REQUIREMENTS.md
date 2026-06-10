@@ -120,10 +120,10 @@ Deferred to a future milestone.
 |-------------|-------|--------|
 | FNDN-01 | Phase 5 | Pending |
 | FNDN-02 | Phase 5 | Pending |
-| FNDN-03 | Phase 5 | Pending |
-| FNDN-04 | Phase 5 | Pending |
+| FNDN-03 | Phase 11 | Pending |
+| FNDN-04 | Phase 11 | Pending |
 | FNDN-05 | Phase 5 | Pending |
-| FNDN-06 | Phase 5 | Pending |
+| FNDN-06 | Phase 11 | Pending |
 | DASH-01 | Phase 5 | Pending |
 | DASH-02 | Phase 5 | Pending |
 | DASH-03 | Phase 5 | Pending |
@@ -136,7 +136,7 @@ Deferred to a future milestone.
 | ASSET-05 | Phase 6 | Complete |
 | ASSET-06 | Phase 6 | Complete |
 | ASGN-01 | Phase 7 | Pending |
-| ASGN-02 | Phase 7 | Pending |
+| ASGN-02 | Phase 12 | Pending |
 | ASGN-03 | Phase 7 | Pending |
 | ASGN-04 | Phase 7 | Pending |
 | ASGN-05 | Phase 7 | Pending |
