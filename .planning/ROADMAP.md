@@ -15,7 +15,7 @@
 ## Phases
 
 - [ ] **Phase 5: Foundation, Layout & Dashboard** — English shell, 4-role login, role-aware sidebar, and dashboard overview with KPIs and alerts
-- [ ] **Phase 6: Asset Registry UI** — Paginated asset list, create/edit forms, lifecycle state badges, filter and search
+- [x] **Phase 6: Asset Registry UI** — Paginated asset list, create/edit forms, lifecycle state badges, filter and search (completed 2026-06-10)
 - [ ] **Phase 7: Assignment & Return Workflow UI** — Request form, approval flow, status badges, return initiation, and close flow
 - [ ] **Phase 8: Maintenance & Warranty UI** — Maintenance schedule list, state update form, warranty tracker, expiry warnings
 - [ ] **Phase 9: AI Governance UIs** — AI assistant panel, OCR intake with confidence routing, predictive maintenance risk cards and escalation
@@ -26,7 +26,7 @@
 | # | Phase | Goal | Requirements | Success Criteria |
 |---|-------|------|--------------|-----------------|
 | 5 | Foundation, Layout & Dashboard | Users can log in as any role, see a role-filtered sidebar, and view the dashboard overview | FNDN-01–06, DASH-01–05 | 5 |
-| 6 | Asset Registry UI | Users can browse, search, filter, create, edit, and retire assets with lifecycle state badges | ASSET-01–06 | 5 |
+| 6 | Asset Registry UI | 2/2 | Complete    | 2026-06-10 |
 | 7 | Assignment & Return Workflow UI | Users can create assignment requests, approve/reject them, track status badges, and close returns | ASGN-01–06 | 5 |
 | 8 | Maintenance & Warranty UI | Users can view and update maintenance schedules and see warranty expiry warnings | MAINT-01–04 | 4 |
 | 9 | AI Governance UIs | Users can query the AI assistant, run OCR intake with confidence routing, and review predictive risk recommendations | AIST-01–04, OCR-01–06, PRED-01–05 | 5 |
@@ -57,7 +57,7 @@
   3. Admin/Asset Manager can click an asset row to open an edit form pre-filled with existing data; saving mock-updates the record
   4. Admin can trigger a "Mark as Retired" action on any asset; a confirmation dialog appears before the state change is applied
   5. Filter controls allow narrowing the list by category and lifecycle state; a search field filters by asset name or serial number
-**Plans:** TBD
+**Plans:** 2/2 plans complete
 **UI hint**: yes
 
 ### Phase 7: Assignment & Return Workflow UI

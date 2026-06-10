@@ -26,12 +26,12 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 ### Asset Registry
 
-- [ ] **ASSET-01**: User can view a paginated list of all assets with lifecycle state badges (registered, available, assigned, maintenance, retired)
-- [ ] **ASSET-02**: Admin/Asset Manager can open a create-asset form and submit a new asset (mock save)
-- [ ] **ASSET-03**: Admin/Asset Manager can open an edit-asset form pre-filled with existing data
-- [ ] **ASSET-04**: Admin can mark an asset as retired via a confirmation dialog
-- [ ] **ASSET-05**: User can filter assets by category and lifecycle state
-- [ ] **ASSET-06**: User can search assets by name or serial number
+- [x] **ASSET-01**: User can view a paginated list of all assets with lifecycle state badges (registered, available, assigned, maintenance, retired)
+- [x] **ASSET-02**: Admin/Asset Manager can open a create-asset form and submit a new asset (mock save)
+- [x] **ASSET-03**: Admin/Asset Manager can open an edit-asset form pre-filled with existing data
+- [x] **ASSET-04**: Admin can mark an asset as retired via a confirmation dialog
+- [x] **ASSET-05**: User can filter assets by category and lifecycle state
+- [x] **ASSET-06**: User can search assets by name or serial number
 
 ### Assignment & Return Workflow
 
@@ -129,12 +129,12 @@ Deferred to a future milestone.
 | DASH-03 | Phase 5 | Pending |
 | DASH-04 | Phase 5 | Pending |
 | DASH-05 | Phase 5 | Pending |
-| ASSET-01 | Phase 6 | Pending |
-| ASSET-02 | Phase 6 | Pending |
-| ASSET-03 | Phase 6 | Pending |
-| ASSET-04 | Phase 6 | Pending |
-| ASSET-05 | Phase 6 | Pending |
-| ASSET-06 | Phase 6 | Pending |
+| ASSET-01 | Phase 6 | Complete |
+| ASSET-02 | Phase 6 | Complete |
+| ASSET-03 | Phase 6 | Complete |
+| ASSET-04 | Phase 6 | Complete |
+| ASSET-05 | Phase 6 | Complete |
+| ASSET-06 | Phase 6 | Complete |
 | ASGN-01 | Phase 7 | Pending |
 | ASGN-02 | Phase 7 | Pending |
 | ASGN-03 | Phase 7 | Pending |
