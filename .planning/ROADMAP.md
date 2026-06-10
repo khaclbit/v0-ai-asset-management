@@ -52,9 +52,9 @@
   5. Dashboard shows a "High Failure Risk" AI alert panel with risk scores and a "Recent Assignments" list with status badges; Logout returns the user to the login page
 **Plans:** 3/3 plans complete
 Plans:
-- [x] 10-01-PLAN.md — Reporting selectors + full reports UI coverage and staff scoping
-- [x] 10-02-PLAN.md — Immutable audit event contract + read-only dataset selectors
-- [x] 10-03-PLAN.md — Audit table UI with category filter and expandable details
+- [x] 05-01-PLAN.md — Foundation dashboard shell, role-aware navigation, and overview baseline
+- [x] 05-02-PLAN.md — DASH-01 KPI contract closure with warranty-soon KPI and regression tests
+- [x] 05-03-PLAN.md — Phase 5 tracker and verification/validation synchronization
 **UI hint**: yes
 
 ### Phase 6: Asset Registry UI
@@ -173,7 +173,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Foundation, Layout & Dashboard | 0/? | Not started | - |
+| 5. Foundation, Layout & Dashboard | 3/3 | Planned | - |
 | 6. Asset Registry UI | 0/? | Not started | - |
 | 7. Assignment & Return Workflow UI | 0/? | Not started | - |
 | 8. Maintenance & Warranty UI | 0/? | Not started | - |
