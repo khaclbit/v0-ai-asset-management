@@ -51,10 +51,10 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 ### AI Assistant
 
-- [ ] **AIST-01**: User can type a natural-language question in an assistant panel
-- [ ] **AIST-02**: User sees a mock grounded response with answer, source, filters, confidence, and correlation_id fields
-- [ ] **AIST-03**: User sees an "insufficient data" response variant with clarifying questions when confidence is low
-- [ ] **AIST-04**: User sees a read-only trace panel showing provenance metadata for each response
+- [x] **AIST-01**: User can type a natural-language question in an assistant panel
+- [x] **AIST-02**: User sees a mock grounded response with answer, source, filters, confidence, and correlation_id fields
+- [x] **AIST-03**: User sees an "insufficient data" response variant with clarifying questions when confidence is low
+- [x] **AIST-04**: User sees a read-only trace panel showing provenance metadata for each response
 
 ### OCR Invoice Intake
 
@@ -145,10 +145,10 @@ Deferred to a future milestone.
 | MAINT-02 | Phase 8 | Complete |
 | MAINT-03 | Phase 8 | Complete |
 | MAINT-04 | Phase 8 | Complete |
-| AIST-01 | Phase 9 | Pending |
-| AIST-02 | Phase 9 | Pending |
-| AIST-03 | Phase 9 | Pending |
-| AIST-04 | Phase 9 | Pending |
+| AIST-01 | Phase 9 | Complete |
+| AIST-02 | Phase 9 | Complete |
+| AIST-03 | Phase 9 | Complete |
+| AIST-04 | Phase 9 | Complete |
 | OCR-01 | Phase 9 | Pending |
 | OCR-02 | Phase 9 | Pending |
 | OCR-03 | Phase 9 | Pending |
