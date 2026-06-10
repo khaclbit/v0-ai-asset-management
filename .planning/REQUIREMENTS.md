@@ -11,10 +11,10 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 - [ ] **FNDN-01**: User sees a login page with all text in English (no Vietnamese)
 - [ ] **FNDN-02**: User can pick one of four roles on the login page: Admin, Asset Manager, Staff, Auditor
-- [ ] **FNDN-03**: User is redirected to a role-appropriate dashboard after login
+- [x] **FNDN-03**: User is redirected to a role-appropriate dashboard after login
 - [x] **FNDN-04**: User sees a sidebar with module labels matching the v1.0 architecture (Assets, Assignments, Maintenance, AI Assistant, OCR Intake, Predictive, Reports, Audit Log)
 - [ ] **FNDN-05**: User sees navigation items filtered by their role (Staff cannot see Audit Log; Auditor cannot see create/edit actions)
-- [ ] **FNDN-06**: User can log out and return to the login page
+- [x] **FNDN-06**: User can log out and return to the login page
 
 ### Dashboard Overview
 
@@ -120,10 +120,10 @@ Deferred to a future milestone.
 |-------------|-------|--------|
 | FNDN-01 | Phase 5 | Pending |
 | FNDN-02 | Phase 5 | Pending |
-| FNDN-03 | Phase 11 | Pending |
+| FNDN-03 | Phase 11 | Complete |
 | FNDN-04 | Phase 11 | Complete |
 | FNDN-05 | Phase 5 | Pending |
-| FNDN-06 | Phase 11 | Pending |
+| FNDN-06 | Phase 11 | Complete |
 | DASH-01 | Phase 5 | Pending |
 | DASH-02 | Phase 5 | Pending |
 | DASH-03 | Phase 5 | Pending |
