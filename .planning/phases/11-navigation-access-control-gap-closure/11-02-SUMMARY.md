@@ -55,7 +55,7 @@ Each task was committed atomically:
 1. **Task 1: Enforce layout-level route RBAC with redirect feedback** - `30d9716`, `edeb60d` (test, feat)
 2. **Task 2: Add auth-flow regression tests for login redirect and logout return** - `980b852` (test)
 
-**Plan metadata:** _pending_
+**Plan metadata:** `1e3e925` (docs)
 
 ## Files Created/Modified
 - `v0-ai-asset-management/app/dashboard/layout.tsx` - adds route-level role authorization, toast feedback, and loop-safe redirect handling.
