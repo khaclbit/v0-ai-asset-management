@@ -17,7 +17,7 @@
 - [ ] **Phase 5: Foundation, Layout & Dashboard** — English shell, 4-role login, role-aware sidebar, and dashboard overview with KPIs and alerts
 - [x] **Phase 6: Asset Registry UI** — Paginated asset list, create/edit forms, lifecycle state badges, filter and search (completed 2026-06-10)
 - [ ] **Phase 7: Assignment & Return Workflow UI** — Request form, approval flow, status badges, return initiation, and close flow
-- [ ] **Phase 8: Maintenance & Warranty UI** — Maintenance schedule list, state update form, warranty tracker, expiry warnings
+- [x] **Phase 8: Maintenance & Warranty UI** — Maintenance schedule list, state update form, warranty tracker, expiry warnings (completed 2026-06-10)
 - [ ] **Phase 9: AI Governance UIs** — AI assistant panel, OCR intake with confidence routing, predictive maintenance risk cards and escalation
 - [ ] **Phase 10: Reporting & Audit Log UI** — Role-scoped report views and immutable audit event log with filtering
 
@@ -28,7 +28,7 @@
 | 5 | Foundation, Layout & Dashboard | Users can log in as any role, see a role-filtered sidebar, and view the dashboard overview | FNDN-01–06, DASH-01–05 | 5 |
 | 6 | Asset Registry UI | 2/2 | Complete    | 2026-06-10 |
 | 7 | Assignment & Return Workflow UI | Users can create assignment requests, approve/reject them, track status badges, and close returns | ASGN-01–06 | 5 |
-| 8 | Maintenance & Warranty UI | Users can view and update maintenance schedules and see warranty expiry warnings | MAINT-01–04 | 4 |
+| 8 | Maintenance & Warranty UI | 2/2 | Complete   | 2026-06-10 |
 | 9 | AI Governance UIs | Users can query the AI assistant, run OCR intake with confidence routing, and review predictive risk recommendations | AIST-01–04, OCR-01–06, PRED-01–05 | 5 |
 | 10 | Reporting & Audit Log UI | Users can view role-scoped reports and Admins/Auditors can read the immutable audit event log | RPT-01–04, AUDT-01–03 | 4 |
 
@@ -82,10 +82,10 @@
   2. Asset Manager can open a maintenance record and change its state via a dropdown or button group; the badge updates immediately (mock)
   3. Warranty tracker page shows a list of assets with warranty state badges: active, expiring_soon, expired, void
   4. Assets with warranty expiring within 30 days surface a notification-style warning (banner, badge, or alert row) visible without navigating away from the tracker
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 Plans:
-- [ ] 08-01-PLAN.md — Maintenance grouped schedule + guarded inline state updates
-- [ ] 08-02-PLAN.md — Warranty tracker filters + <=30 day warning summary/jump behavior
+- [x] 08-01-PLAN.md — Maintenance grouped schedule + guarded inline state updates
+- [x] 08-02-PLAN.md — Warranty tracker filters + <=30 day warning summary/jump behavior
 **UI hint**: yes
 
 ### Phase 9: AI Governance UIs
