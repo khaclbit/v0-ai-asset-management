@@ -82,7 +82,10 @@
   2. Asset Manager can open a maintenance record and change its state via a dropdown or button group; the badge updates immediately (mock)
   3. Warranty tracker page shows a list of assets with warranty state badges: active, expiring_soon, expired, void
   4. Assets with warranty expiring within 30 days surface a notification-style warning (banner, badge, or alert row) visible without navigating away from the tracker
-**Plans:** TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 08-01-PLAN.md — Maintenance grouped schedule + guarded inline state updates
+- [ ] 08-02-PLAN.md — Warranty tracker filters + <=30 day warning summary/jump behavior
 **UI hint**: yes
 
 ### Phase 9: AI Governance UIs
