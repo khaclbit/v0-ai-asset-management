@@ -58,12 +58,12 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 ### OCR Invoice Intake
 
-- [ ] **OCR-01**: User can upload a mock invoice file in an OCR intake panel
-- [ ] **OCR-02**: User sees extracted fields populated with a mock confidence score and band (High/Medium/Low)
-- [ ] **OCR-03**: High-confidence intake shows a pre-filled quick-confirm form
-- [ ] **OCR-04**: Medium-confidence intake shows a field-by-field review form
-- [ ] **OCR-05**: Low-confidence intake shows a rejection message with a rescan prompt
-- [ ] **OCR-06**: User must confirm all mandatory fields (Name, Category, Serial, Purchase Date, Vendor, Price) before submit is enabled
+- [x] **OCR-01**: User can upload a mock invoice file in an OCR intake panel
+- [x] **OCR-02**: User sees extracted fields populated with a mock confidence score and band (High/Medium/Low)
+- [x] **OCR-03**: High-confidence intake shows a pre-filled quick-confirm form
+- [x] **OCR-04**: Medium-confidence intake shows a field-by-field review form
+- [x] **OCR-05**: Low-confidence intake shows a rejection message with a rescan prompt
+- [x] **OCR-06**: User must confirm all mandatory fields (Name, Category, Serial, Purchase Date, Vendor, Price) before submit is enabled
 
 ### Predictive Maintenance
 
@@ -149,12 +149,12 @@ Deferred to a future milestone.
 | AIST-02 | Phase 9 | Complete |
 | AIST-03 | Phase 9 | Complete |
 | AIST-04 | Phase 9 | Complete |
-| OCR-01 | Phase 9 | Pending |
-| OCR-02 | Phase 9 | Pending |
-| OCR-03 | Phase 9 | Pending |
-| OCR-04 | Phase 9 | Pending |
-| OCR-05 | Phase 9 | Pending |
-| OCR-06 | Phase 9 | Pending |
+| OCR-01 | Phase 9 | Complete |
+| OCR-02 | Phase 9 | Complete |
+| OCR-03 | Phase 9 | Complete |
+| OCR-04 | Phase 9 | Complete |
+| OCR-05 | Phase 9 | Complete |
+| OCR-06 | Phase 9 | Complete |
 | PRED-01 | Phase 9 | Pending |
 | PRED-02 | Phase 9 | Pending |
 | PRED-03 | Phase 9 | Pending |
