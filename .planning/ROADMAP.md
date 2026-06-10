@@ -28,7 +28,7 @@
 | 5 | Foundation, Layout & Dashboard | Users can log in as any role, see a role-filtered sidebar, and view the dashboard overview | FNDN-01–06, DASH-01–05 | 5 |
 | 6 | Asset Registry UI | 2/2 | Complete    | 2026-06-10 |
 | 7 | Assignment & Return Workflow UI | Users can create assignment requests, approve/reject them, track status badges, and close returns | ASGN-01–06 | 5 |
-| 8 | Maintenance & Warranty UI | 2/2 | Complete   | 2026-06-10 |
+| 8 | Maintenance & Warranty UI | 2/2 | Complete    | 2026-06-10 |
 | 9 | AI Governance UIs | Users can query the AI assistant, run OCR intake with confidence routing, and review predictive risk recommendations | AIST-01–04, OCR-01–06, PRED-01–05 | 5 |
 | 10 | Reporting & Audit Log UI | Users can view role-scoped reports and Admins/Auditors can read the immutable audit event log | RPT-01–04, AUDT-01–03 | 4 |
 

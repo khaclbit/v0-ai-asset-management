@@ -44,10 +44,10 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 ### Maintenance & Warranty
 
-- [ ] **MAINT-01**: User can view a maintenance schedule list with state badges (scheduled, in_progress, completed, blocked)
-- [ ] **MAINT-02**: Asset Manager can open a maintenance record and update its state
-- [ ] **MAINT-03**: User can view a warranty tracker list with state badges (active, expiring_soon, expired, void)
-- [ ] **MAINT-04**: User sees a notification-style warning for assets with warranty expiring within 30 days
+- [x] **MAINT-01**: User can view a maintenance schedule list with state badges (scheduled, in_progress, completed, blocked)
+- [x] **MAINT-02**: Asset Manager can open a maintenance record and update its state
+- [x] **MAINT-03**: User can view a warranty tracker list with state badges (active, expiring_soon, expired, void)
+- [x] **MAINT-04**: User sees a notification-style warning for assets with warranty expiring within 30 days
 
 ### AI Assistant
 
@@ -141,10 +141,10 @@ Deferred to a future milestone.
 | ASGN-04 | Phase 7 | Pending |
 | ASGN-05 | Phase 7 | Pending |
 | ASGN-06 | Phase 7 | Pending |
-| MAINT-01 | Phase 8 | Pending |
-| MAINT-02 | Phase 8 | Pending |
-| MAINT-03 | Phase 8 | Pending |
-| MAINT-04 | Phase 8 | Pending |
+| MAINT-01 | Phase 8 | Complete |
+| MAINT-02 | Phase 8 | Complete |
+| MAINT-03 | Phase 8 | Complete |
+| MAINT-04 | Phase 8 | Complete |
 | AIST-01 | Phase 9 | Pending |
 | AIST-02 | Phase 9 | Pending |
 | AIST-03 | Phase 9 | Pending |
