@@ -34,7 +34,7 @@
 | 8 | Maintenance & Warranty UI | 2/2 | Complete    | 2026-06-10 |
 | 9 | AI Governance UIs | Users can query the AI assistant, run OCR intake with confidence routing, and review predictive risk recommendations | AIST-01–04, OCR-01–06, PRED-01–05 | 5 |
 | 10 | Reporting & Audit Log UI | Users can view role-scoped reports and Admins/Auditors can read the immutable audit event log | RPT-01–04, AUDT-01–03 | 4 |
-| 11 | Navigation & Access Control Gap Closure | Close navigation and RBAC integration gaps identified in milestone audit | FNDN-03, FNDN-04, FNDN-06 | 3 |
+| 11 | Navigation & Access Control Gap Closure | 1/2 | In Progress|  |
 | 12 | Assignment Approval Integrity Gap Closure | Ensure assignment approval mutates assignment and asset state atomically without conflict desync | ASGN-02 | 2 |
 | 13 | Verification & Validation Artifact Backfill | Backfill missing verification/validation artifacts required for milestone completion gates | N/A (artifact gate) | 3 |
 
@@ -132,7 +132,7 @@ Plans:
   1. Sidebar links only point to existing dashboard routes (no 404 for audit navigation)
   2. Route-level guards deny unauthorized roles from accessing restricted pages via direct URL
   3. Login/logout and role-appropriate navigation behavior remain intact after access-control changes
-**Plans:** TBD
+**Plans:** 1/2 plans executed
 **UI hint**: yes
 
 ### Phase 12: Assignment Approval Integrity Gap Closure
