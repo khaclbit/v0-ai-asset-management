@@ -14,7 +14,7 @@
 
 ## Phases
 
-- [ ] **Phase 5: Foundation, Layout & Dashboard** — English shell, 4-role login, role-aware sidebar, and dashboard overview with KPIs and alerts
+- [x] **Phase 5: Foundation, Layout & Dashboard** — English shell, 4-role login, role-aware sidebar, and dashboard overview with KPIs and alerts (completed 2026-06-10)
 - [x] **Phase 6: Asset Registry UI** — Paginated asset list, create/edit forms, lifecycle state badges, filter and search (completed 2026-06-10)
 - [ ] **Phase 7: Assignment & Return Workflow UI** — Request form, approval flow, status badges, return initiation, and close flow
 - [x] **Phase 8: Maintenance & Warranty UI** — Maintenance schedule list, state update form, warranty tracker, expiry warnings (completed 2026-06-10)
@@ -173,7 +173,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Foundation, Layout & Dashboard | 3/3 | Planned | - |
+| 5. Foundation, Layout & Dashboard | 3/3 | Complete | 2026-06-10 |
 | 6. Asset Registry UI | 0/? | Not started | - |
 | 7. Assignment & Return Workflow UI | 0/? | Not started | - |
 | 8. Maintenance & Warranty UI | 0/? | Not started | - |
@@ -187,17 +187,17 @@ Plans:
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FNDN-01 | Phase 5 | Pending |
-| FNDN-02 | Phase 5 | Pending |
-| FNDN-03 | Phase 5 | Pending |
-| FNDN-04 | Phase 5 | Pending |
-| FNDN-05 | Phase 5 | Pending |
-| FNDN-06 | Phase 5 | Pending |
-| DASH-01 | Phase 5 | Pending |
-| DASH-02 | Phase 5 | Pending |
-| DASH-03 | Phase 5 | Pending |
-| DASH-04 | Phase 5 | Pending |
-| DASH-05 | Phase 5 | Pending |
+| FNDN-01 | Phase 5 | Complete |
+| FNDN-02 | Phase 5 | Complete |
+| FNDN-03 | Phase 5 | Complete |
+| FNDN-04 | Phase 5 | Complete |
+| FNDN-05 | Phase 5 | Complete |
+| FNDN-06 | Phase 5 | Complete |
+| DASH-01 | Phase 5 | Complete |
+| DASH-02 | Phase 5 | Complete |
+| DASH-03 | Phase 5 | Complete |
+| DASH-04 | Phase 5 | Complete |
+| DASH-05 | Phase 5 | Complete |
 | ASSET-01 | Phase 6 | Pending |
 | ASSET-02 | Phase 6 | Pending |
 | ASSET-03 | Phase 6 | Pending |

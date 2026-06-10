@@ -9,20 +9,20 @@ Requirements for v1.1 UI Rebuild milestone. All requirements target `v0-ai-asset
 
 ### Foundation & Navigation
 
-- [ ] **FNDN-01**: User sees a login page with all text in English (no Vietnamese)
-- [ ] **FNDN-02**: User can pick one of four roles on the login page: Admin, Asset Manager, Staff, Auditor
+- [x] **FNDN-01**: User sees a login page with all text in English (no Vietnamese)
+- [x] **FNDN-02**: User can pick one of four roles on the login page: Admin, Asset Manager, Staff, Auditor
 - [x] **FNDN-03**: User is redirected to a role-appropriate dashboard after login
 - [x] **FNDN-04**: User sees a sidebar with module labels matching the v1.0 architecture (Assets, Assignments, Maintenance, AI Assistant, OCR Intake, Predictive, Reports, Audit Log)
-- [ ] **FNDN-05**: User sees navigation items filtered by their role (Staff cannot see Audit Log; Auditor cannot see create/edit actions)
+- [x] **FNDN-05**: User sees navigation items filtered by their role (Staff cannot see Audit Log; Auditor cannot see create/edit actions)
 - [x] **FNDN-06**: User can log out and return to the login page
 
 ### Dashboard Overview
 
-- [ ] **DASH-01**: User sees KPI cards: Total Assets, Active Assignments, Assets in Maintenance, Warranty Expiring Soon
-- [ ] **DASH-02**: User sees an asset-by-category bar chart with English labels
-- [ ] **DASH-03**: User sees a "Warranty Expiring Soon" alert panel (≤ 3 months)
-- [ ] **DASH-04**: User sees a "High Failure Risk" AI alert panel with risk scores
-- [ ] **DASH-05**: User sees a "Recent Assignments" list with status badges
+- [x] **DASH-01**: User sees KPI cards: Total Assets, Active Assignments, Assets in Maintenance, Warranty Expiring Soon
+- [x] **DASH-02**: User sees an asset-by-category bar chart with English labels
+- [x] **DASH-03**: User sees a "Warranty Expiring Soon" alert panel (≤ 3 months)
+- [x] **DASH-04**: User sees a "High Failure Risk" AI alert panel with risk scores
+- [x] **DASH-05**: User sees a "Recent Assignments" list with status badges
 
 ### Asset Registry
 
@@ -118,17 +118,17 @@ Deferred to a future milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FNDN-01 | Phase 5 | Pending |
-| FNDN-02 | Phase 5 | Pending |
+| FNDN-01 | Phase 5 | Complete |
+| FNDN-02 | Phase 5 | Complete |
 | FNDN-03 | Phase 11 | Complete |
 | FNDN-04 | Phase 11 | Complete |
-| FNDN-05 | Phase 5 | Pending |
+| FNDN-05 | Phase 5 | Complete |
 | FNDN-06 | Phase 11 | Complete |
-| DASH-01 | Phase 5 | Pending |
-| DASH-02 | Phase 5 | Pending |
-| DASH-03 | Phase 5 | Pending |
-| DASH-04 | Phase 5 | Pending |
-| DASH-05 | Phase 5 | Pending |
+| DASH-01 | Phase 5 | Complete |
+| DASH-02 | Phase 5 | Complete |
+| DASH-03 | Phase 5 | Complete |
+| DASH-04 | Phase 5 | Complete |
+| DASH-05 | Phase 5 | Complete |
 | ASSET-01 | Phase 6 | Complete |
 | ASSET-02 | Phase 6 | Complete |
 | ASSET-03 | Phase 6 | Complete |
