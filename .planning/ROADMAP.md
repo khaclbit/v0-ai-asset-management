@@ -22,7 +22,7 @@
 - [ ] **Phase 10: Reporting & Audit Log UI** — Role-scoped report views and immutable audit event log with filtering
 - [x] **Phase 11: Navigation & Access Control Gap Closure** — Fix broken audit navigation target and enforce route-level RBAC for restricted modules (completed 2026-06-10)
 - [x] **Phase 12: Assignment Approval Integrity Gap Closure** — Fix assignment approval side-effect desynchronization in conflict paths (completed 2026-06-10)
-- [ ] **Phase 13: Verification & Validation Artifact Backfill** — Add missing verification/validation artifacts for Phases 5, 8, and 9
+- [x] **Phase 13: Verification & Validation Artifact Backfill** — Add missing verification/validation artifacts for Phases 5, 8, and 9 (completed 2026-06-10)
 
 ## Summary
 
@@ -36,7 +36,7 @@
 | 10 | Reporting & Audit Log UI | Users can view role-scoped reports and Admins/Auditors can read the immutable audit event log | RPT-01–04, AUDT-01–03 | 4 |
 | 11 | Navigation & Access Control Gap Closure | 2/2 | Complete   | 2026-06-10 |
 | 12 | Assignment Approval Integrity Gap Closure | 1/1 | Complete   | 2026-06-10 |
-| 13 | Verification & Validation Artifact Backfill | Backfill missing verification/validation artifacts required for milestone completion gates | N/A (artifact gate) | 3 |
+| 13 | Verification & Validation Artifact Backfill | 2/2 | Complete   | 2026-06-10 |
 
 ## Phase Details
 
@@ -173,7 +173,7 @@ Plans:
 | 10. Reporting & Audit Log UI | 0/? | Not started | - |
 | 11. Navigation & Access Control Gap Closure | 2/2 | Complete | 2026-06-10 |
 | 12. Assignment Approval Integrity Gap Closure | 0/? | Not started | - |
-| 13. Verification & Validation Artifact Backfill | 2/2 | Planned | - |
+| 13. Verification & Validation Artifact Backfill | 2/2 | Complete | 2026-06-10 |
 
 ## Coverage
 
