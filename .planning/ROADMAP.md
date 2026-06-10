@@ -155,7 +155,10 @@ Plans:
   1. Phase 5 and Phase 9 each have a current VERIFICATION.md with explicit requirement coverage and evidence
   2. Missing VALIDATION.md artifacts for audited phases are created or updated with Nyquist status and per-task mapping
   3. Milestone re-audit no longer reports missing verification/validation artifacts for Phases 5, 8, and 9
-**Plans:** TBD
+**Plans:** 2/2 plans complete
+Plans:
+- [x] 13-01-PLAN.md — Backfill 05/09 VERIFICATION and 05/08 VALIDATION artifacts
+- [x] 13-02-PLAN.md — Re-audit milestone artifact gaps and record Phase 13 verification evidence
 **UI hint**: no
 
 ## Progress
@@ -170,7 +173,7 @@ Plans:
 | 10. Reporting & Audit Log UI | 0/? | Not started | - |
 | 11. Navigation & Access Control Gap Closure | 2/2 | Complete | 2026-06-10 |
 | 12. Assignment Approval Integrity Gap Closure | 0/? | Not started | - |
-| 13. Verification & Validation Artifact Backfill | 0/? | Not started | - |
+| 13. Verification & Validation Artifact Backfill | 2/2 | Planned | - |
 
 ## Coverage
 
