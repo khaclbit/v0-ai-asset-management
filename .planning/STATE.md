@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Rebuild
 status: completed
-stopped_at: Phase 6 context gathered
-last_updated: "2026-06-10T03:40:05.274Z"
+stopped_at: Phase 6 UI-SPEC approved
+last_updated: "2026-06-10T06:33:49.420Z"
 last_activity: 2026-06-10 -- Phase 5 completed (0 TypeScript errors, full English rewrite)
 progress:
   total_phases: 6
@@ -73,7 +73,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-10T03:40:05.266Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-asset-registry-ui/06-CONTEXT.md
+Last session: 2026-06-10T06:33:49.410Z
+Stopped at: Phase 6 UI-SPEC approved
+Resume file: .planning/phases/06-asset-registry-ui/06-UI-SPEC.md
 Next action: `/gsd-plan-phase 6`
