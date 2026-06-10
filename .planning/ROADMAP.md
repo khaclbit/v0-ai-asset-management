@@ -50,7 +50,11 @@
   3. Dashboard shows four KPI cards (Total Assets, Active Assignments, Assets in Maintenance, Warranty Expiring Soon) with mock numeric values
   4. Dashboard shows an asset-by-category bar chart with English labels and a "Warranty Expiring Soon" alert panel (≤ 3 months)
   5. Dashboard shows a "High Failure Risk" AI alert panel with risk scores and a "Recent Assignments" list with status badges; Logout returns the user to the login page
-**Plans:** TBD
+**Plans:** 3/3 plans complete
+Plans:
+- [x] 10-01-PLAN.md — Reporting selectors + full reports UI coverage and staff scoping
+- [x] 10-02-PLAN.md — Immutable audit event contract + read-only dataset selectors
+- [x] 10-03-PLAN.md — Audit table UI with category filter and expandable details
 **UI hint**: yes
 
 ### Phase 6: Asset Registry UI
@@ -170,7 +174,7 @@ Plans:
 | 7. Assignment & Return Workflow UI | 0/? | Not started | - |
 | 8. Maintenance & Warranty UI | 0/? | Not started | - |
 | 9. AI Governance UIs | 3/3 | Complete | 2026-06-10 |
-| 10. Reporting & Audit Log UI | 0/? | Not started | - |
+| 10. Reporting & Audit Log UI | 3/3 | Planned | - |
 | 11. Navigation & Access Control Gap Closure | 2/2 | Complete | 2026-06-10 |
 | 12. Assignment Approval Integrity Gap Closure | 0/? | Not started | - |
 | 13. Verification & Validation Artifact Backfill | 2/2 | Complete | 2026-06-10 |
