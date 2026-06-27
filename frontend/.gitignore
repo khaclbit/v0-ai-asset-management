@@ -6,11 +6,5 @@ __v0_jsx-dev-runtime.ts
 .v0-trash/
 .vercel/
 
-# Environment variables
-.env*.local
-
-# Common ignores
-node_modules
-.next/
-.DS_Store
+# Next.js generated typing file
 next-env.d.ts
