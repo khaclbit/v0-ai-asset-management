@@ -1,0 +1,37 @@
+@startuml
+title AI Governance Workflow (Sequence UML)
+
+actor User
+participant "Assistant UI" as UI
+participant "Assistant Orchestrator" as Orchestrator
+participant "Grounding Guard" as Guard
+participant "Read Adapter" as Reader
+database "Internal Asset Data" as Data
+participant "Approval Service (Human)" as Approval
+participant "Audit Emitter" as Audit
+
+User -> UI : Ask natural-language question
+UI -> Orchestrator : Submit intent
+Orchestrator -> Guard : Validate scope (internal-only)
+Guard -> Reader : Read-only query plan
+Reader -> Data : Execute query (read-only)
+Data --> Reader : Results
+Reader --> Orchestrator : Evidence package
+
+alt Sufficient data
+  Orchestrator --> UI : Answer + provenance + correlation_id
+else Insufficient data
+  Orchestrator --> UI : insufficient_data + clarifying questions
+end
+
+Orchestrator -> Audit : Append immutable recommendation event
+
+== High-impact action path ==
+User -> Approval : Request override/approval
+Approval -> Audit : Record decision, actor, rationale, timestamp
+note right of Approval
+Dual-control required for
+high-impact overrides.
+end note
+@enduml
+

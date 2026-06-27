@@ -1,0 +1,45 @@
+@startuml
+title Asset Lifecycle Workflow (Activity UML)
+start
+
+:Receive registration request;
+:Validate required fields + uniqueness;
+if (Valid?) then (yes)
+  :Categorize asset + assign ownership;
+  :Set state = registered;
+  :Set state = available;
+  :Emit registration audit event;
+else (no)
+  :Reject request + return validation errors;
+  stop
+endif
+
+:Create assignment request;
+if (Approval policy passed?) then (yes)
+  :Set assignment state = active;
+  if (Return before deadline?) then (yes)
+    :Validate return conditions;
+    :Set assignment state = closed;
+  else (no)
+    :Set assignment state = overdue;
+    :Trigger overdue intervention;
+    :Close assignment after return validation;
+  endif
+else (no)
+  :Set assignment state = rejected;
+endif
+
+:Monitor maintenance/warranty triggers;
+if (Trigger detected?) then (yes)
+  :Open maintenance/warranty workflow;
+  :Send notifications (transition/deadline);
+  if (Completion criteria met?) then (yes)
+    :Close workflow;
+  else (no)
+    :Escalate and continue monitoring;
+  endif
+endif
+
+stop
+@enduml
+

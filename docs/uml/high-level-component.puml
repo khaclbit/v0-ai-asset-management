@@ -1,0 +1,44 @@
+@startuml
+title AI Asset Management - High-Level Component UML
+skinparam componentStyle rectangle
+left to right direction
+
+actor "User" as User
+component "Web Frontend\n(React/TypeScript)" as Frontend
+component "Backend API\n(FastAPI)" as API
+component "Identity & Access" as IAM
+component "Asset Lifecycle" as AssetLifecycle
+component "Maintenance & Warranty" as Maintenance
+component "Reporting & Insights" as Reporting
+component "AI Orchestration" as AIOrch
+component "Audit & Compliance" as Audit
+database "PostgreSQL\n(System of Record)" as DB
+component "Async Workers / Event Bus" as Workers
+cloud "AI Providers\n(LLM / OCR / Predictive)" as AIProviders
+
+User --> Frontend : UI actions
+Frontend --> API : HTTPS API calls
+
+API --> IAM : authz/authn
+API --> AssetLifecycle : lifecycle commands
+API --> Maintenance : maintenance commands
+API --> Reporting : reporting queries
+API --> AIOrch : AI-assisted requests
+API --> Audit : append audit events
+
+IAM --> DB
+AssetLifecycle --> DB
+Maintenance --> DB
+Reporting --> DB
+Audit --> DB
+AIOrch --> Workers : async processing
+Workers --> AIProviders : AI inference
+AIOrch --> Audit : trace linkage
+
+note right of AIOrch
+AI outcomes are advisory.
+Human approval gates apply
+for high-impact actions.
+end note
+@enduml
+
