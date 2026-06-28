@@ -390,3 +390,164 @@ Plans:
 
 ---
 *v1.2 roadmap appended: 2026-06-28 for milestone v1.2 IoT System Design*
+
+---
+
+## Milestone v1.3: Frontend UI Implementation
+
+**Goal:** Implement all 10 frontend UI sections with mock/static data, extending existing v1.1 pages and building new IoT/AI/Notifications/Audit/User Management pages — fully aligned to SDD wireframes, using shadcn/ui + Tailwind v4 + Recharts.
+**Phases:** 5 (Phase 20–24)
+**Requirements mapped:** 42
+
+## Phases
+
+- [ ] **Phase 20: Dashboard Refinement & Design System Hardening** — Align dashboard to WIREFRAMES.md §2 layout, add Asset Health, AI Risk Distribution, Recent Alerts, Maintenance Schedule, Equipment Status widgets; harden all cross-cutting DX requirements
+- [ ] **Phase 21: Asset, Assignment & Maintenance Refinement** — Extend all three existing v1.1 pages to match WIREFRAMES.md §3–§5: add missing columns, overdue derived state, full assignment state lifecycle UI, maintenance state transitions
+- [ ] **Phase 22: IoT Monitoring Page** — Build `/dashboard/iot` page with device grid, sensor value chips, per-sensor telemetry charts with threshold reference lines (WIREFRAMES_2.md §6)
+- [ ] **Phase 23: AI Predictive Maintenance Page** — Build `/dashboard/ai` page (fix `/predictive` route gap), health score leaderboard, recommendation cards with Approve/Defer workflow (WIREFRAMES_2.md §7)
+- [ ] **Phase 24: Notifications, Audit Log & User Management** — Build `/dashboard/notifications` inbox, `/dashboard/audit` append-only log, `/dashboard/users` admin-only user management (WIREFRAMES_2.md §8–§10)
+
+---
+
+### Phase 20: Dashboard Refinement & Design System Hardening
+
+**Goal:** Dashboard page matches WIREFRAMES.md §2 exactly; all cross-cutting DX requirements enforced across the app.
+**Depends on:** Nothing (first phase of v1.3)
+
+**Success criteria:**
+1. Dashboard shows all 6 widget sections: stat cards, Asset Health chart, AI Risk Distribution card, Recent Alerts, Maintenance Schedule, Equipment Status
+2. All charts use `ChartContainer` pattern — no raw `ResponsiveContainer` anywhere in the codebase
+3. All status badges use `status-badge.tsx` — no inline colored spans
+4. Empty states on all list pages use `ChartEmptyState` or equivalent component
+5. Sidebar responsive collapse (`hidden md:flex`) works on viewport < 768px
+
+**Requirements:** DASH2-01, DASH2-02, DASH2-03, DASH2-04, DASH2-05, DASH2-06, DX-01, DX-02, DX-03, DX-04, DX-05
+
+---
+
+### Phase 21: Asset, Assignment & Maintenance Refinement
+
+**Goal:** Three existing pages fully aligned to WIREFRAMES.md §3–§5 with all missing columns, filters, state badges, and workflow actions.
+**Depends on:** Phase 20
+
+**Success criteria:**
+1. Asset list shows all columns from WIREFRAMES.md §3.1; detail drawer shows sensor_device_id and lifecycle state machine display
+2. Assignment list shows all 5 states with correct badges; overdue rows are visually distinguished using client-side derived logic
+3. Assignment request form, approval flow, and return initiation all work end-to-end with mock data
+4. Maintenance list shows all 4 states; detail page shows blocked reason and AI correlation ID when present
+5. Manager/Admin can advance maintenance state through all transitions
+
+**Requirements:** ASSET2-01, ASSET2-02, ASSET2-03, ASSET2-04, ASGN2-01, ASGN2-02, ASGN2-03, ASGN2-04, ASGN2-05, ASGN2-06, MAINT2-01, MAINT2-02, MAINT2-03, MAINT2-04
+
+---
+
+### Phase 22: IoT Monitoring Page
+
+**Goal:** A fully functional `/dashboard/iot` page with device grid and per-sensor telemetry charts.
+**Depends on:** Phase 20
+
+**Success criteria:**
+1. Device grid shows one card per monitored asset with Online/Offline/Warning status badge
+2. Each card shows 3–6 sensor reading value chips with correct sensor types per category (Laptop: no vibration; Printer: all 6)
+3. Selecting a device shows per-sensor line charts with realistic mock time-series data
+4. Charts include warning and critical reference lines per DESIGN_SYSTEM.md §5 chart standards
+5. Page is accessible from sidebar `/dashboard/iot` link with correct role filtering (Admin + Manager visible)
+
+**Requirements:** IOT-01, IOT-02, IOT-03, IOT-04, IOT-05
+
+---
+
+### Phase 23: AI Predictive Maintenance Page
+
+**Goal:** `/dashboard/ai` page fully implemented with health score leaderboard and Approve/Defer recommendation workflow.
+**Depends on:** Phase 20
+
+**Success criteria:**
+1. `/dashboard/ai/page.tsx` exists and renders — old `/dashboard/predictive` route redirects to `/dashboard/ai`
+2. Health score leaderboard shows assets sorted by failure risk with health %, risk %, confidence %
+3. Recommendation cards show all fields: health gauge, risk badge, confidence, top factors list
+4. Approve and Defer actions are only visible to Manager/Admin; each shows a confirmation dialog
+5. Approve dialog explains maintenance ticket creation; Defer dialog has reason input field
+6. Status badges use the already-implemented `pending`/`approved`/`deferred`/`expired` states
+
+**Requirements:** AIPM-01, AIPM-02, AIPM-03, AIPM-04, AIPM-05, AIPM-06, AIPM-07
+
+---
+
+### Phase 24: Notifications, Audit Log & User Management
+
+**Goal:** Three new pages (`/dashboard/notifications`, `/dashboard/audit`, `/dashboard/users`) all fully functional with mock data.
+**Depends on:** Phase 20
+
+**Success criteria:**
+1. Notifications inbox shows all 4 notification types; unread items are visually distinct; mark-as-read and mark-all-as-read work
+2. Notification type filter works client-side; notification bell in top nav shows unread count badge
+3. Audit log table is display-only with all columns; clicking a row expands before/after JSON panel
+4. Audit log category filter (business/security/ai_assisted) works client-side
+5. User list shows username, email, role badge, active status; Admin can create user, edit role, and deactivate (soft-delete with confirmation)
+6. User Management page returns 403-style redirect for non-Admin roles
+
+**Requirements:** NOTIF-01, NOTIF-02, NOTIF-03, NOTIF-04, NOTIF-05, AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, USER-01, USER-02, USER-03, USER-04, USER-05
+
+---
+
+### v1.3 Requirement Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DASH2-01 | Phase 20 | Pending |
+| DASH2-02 | Phase 20 | Pending |
+| DASH2-03 | Phase 20 | Pending |
+| DASH2-04 | Phase 20 | Pending |
+| DASH2-05 | Phase 20 | Pending |
+| DASH2-06 | Phase 20 | Pending |
+| DX-01 | Phase 20 | Pending |
+| DX-02 | Phase 20 | Pending |
+| DX-03 | Phase 20 | Pending |
+| DX-04 | Phase 20 | Pending |
+| DX-05 | Phase 20 | Pending |
+| ASSET2-01 | Phase 21 | Pending |
+| ASSET2-02 | Phase 21 | Pending |
+| ASSET2-03 | Phase 21 | Pending |
+| ASSET2-04 | Phase 21 | Pending |
+| ASGN2-01 | Phase 21 | Pending |
+| ASGN2-02 | Phase 21 | Pending |
+| ASGN2-03 | Phase 21 | Pending |
+| ASGN2-04 | Phase 21 | Pending |
+| ASGN2-05 | Phase 21 | Pending |
+| ASGN2-06 | Phase 21 | Pending |
+| MAINT2-01 | Phase 21 | Pending |
+| MAINT2-02 | Phase 21 | Pending |
+| MAINT2-03 | Phase 21 | Pending |
+| MAINT2-04 | Phase 21 | Pending |
+| IOT-01 | Phase 22 | Pending |
+| IOT-02 | Phase 22 | Pending |
+| IOT-03 | Phase 22 | Pending |
+| IOT-04 | Phase 22 | Pending |
+| IOT-05 | Phase 22 | Pending |
+| AIPM-01 | Phase 23 | Pending |
+| AIPM-02 | Phase 23 | Pending |
+| AIPM-03 | Phase 23 | Pending |
+| AIPM-04 | Phase 23 | Pending |
+| AIPM-05 | Phase 23 | Pending |
+| AIPM-06 | Phase 23 | Pending |
+| AIPM-07 | Phase 23 | Pending |
+| NOTIF-01 | Phase 24 | Pending |
+| NOTIF-02 | Phase 24 | Pending |
+| NOTIF-03 | Phase 24 | Pending |
+| NOTIF-04 | Phase 24 | Pending |
+| NOTIF-05 | Phase 24 | Pending |
+| AUDIT-01 | Phase 24 | Pending |
+| AUDIT-02 | Phase 24 | Pending |
+| AUDIT-03 | Phase 24 | Pending |
+| AUDIT-04 | Phase 24 | Pending |
+| USER-01 | Phase 24 | Pending |
+| USER-02 | Phase 24 | Pending |
+| USER-03 | Phase 24 | Pending |
+| USER-04 | Phase 24 | Pending |
+| USER-05 | Phase 24 | Pending |
+
+**v1.3 Coverage: 42/42 requirements mapped ✓**
+
+---
+*v1.3 roadmap appended: 2026-06-28 for milestone v1.3 Frontend UI Implementation*
