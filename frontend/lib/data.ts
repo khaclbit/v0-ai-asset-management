@@ -29,6 +29,8 @@ export type Asset = {
   assignee: string | null
   repairCount: number
   usageHoursPerWeek: number
+  sensorDeviceId?: string | null
+  lastUpdated?: string // ISO date — stamped on create/edit
 }
 
 // ─── Assignment Domain ───────────────────────────────────────────────
@@ -52,6 +54,7 @@ export type AssignmentRecord = {
   returnDate: string | null
   status: AssignmentStatus
   rejectReason?: string
+  notes?: string
 }
 
 // ─── Maintenance Domain ──────────────────────────────────────────────
@@ -72,6 +75,7 @@ export type MaintenanceRecord = {
   scheduledDate: string
   completedDate: string | null
   notes: string
+  aiCorrelationId?: string | null
 }
 
 // ─── Warranty Domain ─────────────────────────────────────────────────
@@ -139,6 +143,8 @@ export const assets: Asset[] = [
     assignee: "Alex Carter",
     repairCount: 1,
     usageHoursPerWeek: 45,
+    sensorDeviceId: "SENSOR-1001",
+    lastUpdated: "2025-06-15",
   },
   {
     id: "AS-1002",
@@ -154,6 +160,8 @@ export const assets: Asset[] = [
     assignee: "Diana Pham",
     repairCount: 0,
     usageHoursPerWeek: 40,
+    sensorDeviceId: "SENSOR-1002",
+    lastUpdated: "2025-06-10",
   },
   {
     id: "AS-1003",
@@ -169,6 +177,8 @@ export const assets: Asset[] = [
     assignee: null,
     repairCount: 0,
     usageHoursPerWeek: 0,
+    sensorDeviceId: null,
+    lastUpdated: "2025-05-20",
   },
   {
     id: "AS-1004",
@@ -184,6 +194,8 @@ export const assets: Asset[] = [
     assignee: null,
     repairCount: 4,
     usageHoursPerWeek: 22,
+    sensorDeviceId: "SENSOR-1004",
+    lastUpdated: "2025-06-20",
   },
   {
     id: "AS-1005",
@@ -199,6 +211,8 @@ export const assets: Asset[] = [
     assignee: "James Walker",
     repairCount: 6,
     usageHoursPerWeek: 38,
+    sensorDeviceId: "SENSOR-1005",
+    lastUpdated: "2025-06-18",
   },
   {
     id: "AS-1006",
@@ -214,6 +228,8 @@ export const assets: Asset[] = [
     assignee: "Michael Nguyen",
     repairCount: 0,
     usageHoursPerWeek: 35,
+    sensorDeviceId: null,
+    lastUpdated: "2025-05-28",
   },
   {
     id: "AS-1007",
@@ -229,6 +245,8 @@ export const assets: Asset[] = [
     assignee: "Diana Pham",
     repairCount: 0,
     usageHoursPerWeek: 30,
+    sensorDeviceId: null,
+    lastUpdated: "2025-05-15",
   },
   {
     id: "AS-1008",
@@ -244,6 +262,8 @@ export const assets: Asset[] = [
     assignee: null,
     repairCount: 9,
     usageHoursPerWeek: 50,
+    sensorDeviceId: "SENSOR-1008",
+    lastUpdated: "2025-06-12",
   },
   {
     id: "AS-1009",
@@ -259,6 +279,8 @@ export const assets: Asset[] = [
     assignee: null,
     repairCount: 1,
     usageHoursPerWeek: 8,
+    sensorDeviceId: null,
+    lastUpdated: "2025-04-30",
   },
   {
     id: "AS-1010",
@@ -274,6 +296,8 @@ export const assets: Asset[] = [
     assignee: "James Walker",
     repairCount: 2,
     usageHoursPerWeek: 42,
+    sensorDeviceId: "SENSOR-1010",
+    lastUpdated: "2025-06-08",
   },
   {
     id: "AS-1011",
@@ -289,6 +313,8 @@ export const assets: Asset[] = [
     assignee: null,
     repairCount: 3,
     usageHoursPerWeek: 0,
+    sensorDeviceId: null,
+    lastUpdated: "2025-03-01",
   },
   {
     id: "AS-1012",
@@ -304,6 +330,8 @@ export const assets: Asset[] = [
     assignee: null,
     repairCount: 2,
     usageHoursPerWeek: 0,
+    sensorDeviceId: null,
+    lastUpdated: "2025-05-14",
   },
 ]
 
@@ -376,6 +404,7 @@ export const maintenanceRecords: MaintenanceRecord[] = [
     scheduledDate: "2026-06-05",
     completedDate: null,
     notes: "High failure risk flagged by predictive model. Roller replacement required.",
+    aiCorrelationId: "REC-007",
   },
   {
     id: "MNT-002",
@@ -387,6 +416,7 @@ export const maintenanceRecords: MaintenanceRecord[] = [
     scheduledDate: "2026-06-15",
     completedDate: null,
     notes: "Annual hydraulic system inspection.",
+    aiCorrelationId: null,
   },
   {
     id: "MNT-003",
@@ -398,6 +428,7 @@ export const maintenanceRecords: MaintenanceRecord[] = [
     scheduledDate: "2026-05-28",
     completedDate: null,
     notes: "Waiting for replacement drum unit. Blocked by procurement.",
+    aiCorrelationId: null,
   },
   {
     id: "MNT-004",
@@ -409,6 +440,7 @@ export const maintenanceRecords: MaintenanceRecord[] = [
     scheduledDate: "2026-04-10",
     completedDate: "2026-04-12",
     notes: "Annual OS refresh and battery replacement. Completed on schedule.",
+    aiCorrelationId: null,
   },
 ]
 

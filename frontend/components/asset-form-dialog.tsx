@@ -44,6 +44,7 @@ const empty: Asset = {
   assignee: null,
   repairCount: 0,
   usageHoursPerWeek: 0,
+  sensorDeviceId: null,
 }
 
 export function AssetFormDialog({ open, onOpenChange, initial, onSave }: Props) {
@@ -170,6 +171,16 @@ export function AssetFormDialog({ open, onOpenChange, initial, onSave }: Props) 
               <Label htmlFor="location">Location</Label>
               <Input id="location" value={form.location} onChange={(e) => update("location", e.target.value)} />
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="sensorId">Sensor Device ID</Label>
+            <Input
+              id="sensorId"
+              placeholder="e.g. SENSOR-1001 (leave blank if no sensor)"
+              value={form.sensorDeviceId ?? ""}
+              onChange={(e) => update("sensorDeviceId", e.target.value || null)}
+            />
           </div>
 
           <DialogFooter className="mt-2">

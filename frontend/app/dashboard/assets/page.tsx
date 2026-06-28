@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Topbar } from "@/components/topbar"
 import { StatusBadge } from "@/components/status-badge"
+import { SensorStatusDot } from "@/components/sensor-status-dot"
 import { AssetFormDialog } from "@/components/asset-form-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -38,11 +40,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useStore } from "@/lib/store"
-import { CATEGORIES, depreciation, formatCurrency, type Asset } from "@/lib/data"
-import { Plus, Search, MoreHorizontal, Pencil, Trash2, Lock } from "lucide-react"
+import { CATEGORIES, type Asset } from "@/lib/data"
+import { Plus, Search, MoreHorizontal, Eye, Trash2, Lock } from "lucide-react"
 import { toast } from "sonner"
 
 export default function AssetsPage() {
+  const router = useRouter()
   const { user, assets, addAsset, updateAsset, retireAsset } = useStore()
   const canCreateEdit = user?.role === "Admin" || user?.role === "Asset Manager"
   const canRetire = user?.role === "Admin"
@@ -96,12 +99,6 @@ export default function AssetsPage() {
 
   function openAdd() {
     setEditing(null)
-    setFormOpen(true)
-  }
-
-  function openEdit(asset: Asset) {
-    if (!canCreateEdit) return
-    setEditing(asset)
     setFormOpen(true)
   }
 
@@ -188,77 +185,76 @@ export default function AssetsPage() {
                   <TableHead>ID</TableHead>
                   <TableHead>Asset Name</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Purchase Price</TableHead>
-                  <TableHead className="text-right">Book Value</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Sensor</TableHead>
                   <TableHead>Assignee</TableHead>
                   {canCreateEdit ? <TableHead className="w-12" /> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pagedAssets.map((a) => {
-                  const dep = depreciation(a)
-                  return (
-                    <TableRow
-                      key={a.id}
-                      onClick={canCreateEdit ? () => openEdit(a) : undefined}
-                      className={canCreateEdit ? "cursor-pointer" : undefined}
-                    >
-                      <TableCell className="font-mono text-xs text-muted-foreground">{a.id}</TableCell>
+                {pagedAssets.map((a) => (
+                  <TableRow
+                    key={a.id}
+                    onClick={() => router.push(`/dashboard/assets/${a.id}`)}
+                    className="cursor-pointer"
+                  >
+                    <TableCell className="font-mono text-xs text-muted-foreground">{a.id}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{a.name}</div>
+                      <div className="text-xs text-muted-foreground">{a.serial}</div>
+                    </TableCell>
+                    <TableCell className="text-sm">{a.category}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{a.location}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={a.status} />
+                    </TableCell>
+                    <TableCell>
+                      <SensorStatusDot sensorDeviceId={a.sensorDeviceId} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{a.assignee ?? "—"}</TableCell>
+                    {canCreateEdit ? (
                       <TableCell>
-                        <div className="font-medium">{a.name}</div>
-                        <div className="text-xs text-muted-foreground">{a.serial}</div>
-                      </TableCell>
-                      <TableCell className="text-sm">{a.category}</TableCell>
-                      <TableCell className="text-right text-sm">{formatCurrency(a.price)}</TableCell>
-                      <TableCell className="text-right text-sm">{formatCurrency(dep.bookValue)}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={a.status} />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{a.assignee ?? "—"}</TableCell>
-                      {canCreateEdit ? (
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              className="inline-flex size-8 items-center justify-center rounded-md hover:bg-accent"
-                              onClick={(e) => e.stopPropagation()}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            className="inline-flex size-8 items-center justify-center rounded-md hover:bg-accent"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="size-4" />
+                            <span className="sr-only">Actions</span>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/dashboard/assets/${a.id}`)
+                              }}
                             >
-                              <MoreHorizontal className="size-4" />
-                              <span className="sr-only">Actions</span>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  openEdit(a)
-                                }}
-                              >
-                                <Pencil className="size-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              {canRetire ? (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    variant="destructive"
-                                    disabled={a.status === "retired"}
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setRetireTarget(a)
-                                    }}
-                                  >
-                                    <Trash2 className="size-4" />
-                                    Mark as Retired
-                                  </DropdownMenuItem>
-                                </>
-                              ) : null}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                  )
-                })}
+                              <Eye className="size-4" />
+                              View / Edit
+                            </DropdownMenuItem>
+                            {canRetire ? (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  disabled={a.status === "retired"}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setRetireTarget(a)
+                                  }}
+                                >
+                                  <Trash2 className="size-4" />
+                                  Mark as Retired
+                                </DropdownMenuItem>
+                              </>
+                            ) : null}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    ) : null}
+                  </TableRow>
+                ))}
                 {filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={canCreateEdit ? 8 : 7} className="py-10 text-center text-muted-foreground">

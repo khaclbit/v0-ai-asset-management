@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Topbar } from "@/components/topbar"
 import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -44,7 +45,7 @@ import {
   warrantyUrgency,
 } from "@/lib/maintenance-warranty"
 import { cn } from "@/lib/utils"
-import { AlertTriangle, ArrowRight, Search, Wrench } from "lucide-react"
+import { AlertTriangle, ArrowRight, Plus, Search, Wrench } from "lucide-react"
 import { toast } from "sonner"
 
 const MAINTENANCE_STATUS_LABEL: Record<string, string> = {
@@ -75,7 +76,7 @@ function relativeWarrantyLabel(daysLeft: number) {
 }
 
 export default function MaintenancePage() {
-  const { user, maintenanceRecords, warrantyRecords, updateMaintenanceStatus } = useStore()
+  const { user, assets, maintenanceRecords, warrantyRecords, updateMaintenanceStatus, addMaintenanceRecord } = useStore()
 
   const canManage = user?.role === "Asset Manager"
 
@@ -84,6 +85,14 @@ export default function MaintenancePage() {
   const [query, setQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [focusedWarrantyId, setFocusedWarrantyId] = useState<string | null>(null)
+
+  // Create Ticket state
+  const [ticketOpen, setTicketOpen] = useState(false)
+  const [ticketAssetId, setTicketAssetId] = useState("")
+  const [ticketType, setTicketType] = useState<"scheduled" | "risk_based" | "warranty">("scheduled")
+  const [ticketPriority, setTicketPriority] = useState<"high" | "medium" | "low">("medium")
+  const [ticketDate, setTicketDate] = useState(new Date().toISOString().slice(0, 10))
+  const [ticketNotes, setTicketNotes] = useState("")
 
   const maintenanceByStatus = useMemo(() => {
     return MAINTENANCE_GROUP_ORDER.map((status) => ({
@@ -164,6 +173,31 @@ export default function MaintenancePage() {
     setFocusedWarrantyId(recordId)
   }
 
+  function handleCreateTicket(e: React.FormEvent) {
+    e.preventDefault()
+    const asset = assets.find((a) => a.id === ticketAssetId)
+    if (!asset) return
+    addMaintenanceRecord({
+      id: `MNT-${Date.now().toString(36).toUpperCase()}`,
+      assetId: ticketAssetId,
+      assetName: asset.name,
+      type: ticketType,
+      priority: ticketPriority,
+      status: "scheduled",
+      scheduledDate: ticketDate,
+      completedDate: null,
+      notes: ticketNotes.trim(),
+      aiCorrelationId: null,
+    })
+    toast.success("Maintenance ticket created")
+    setTicketOpen(false)
+    setTicketAssetId("")
+    setTicketType("scheduled")
+    setTicketPriority("medium")
+    setTicketDate(new Date().toISOString().slice(0, 10))
+    setTicketNotes("")
+  }
+
   return (
     <>
       <Topbar title="Maintenance & Warranty" subtitle={subtitle} />
@@ -212,10 +246,18 @@ export default function MaintenancePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Wrench className="size-4 text-primary" />
-              Maintenance Schedule
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Wrench className="size-4 text-primary" />
+                Maintenance Schedule
+              </CardTitle>
+              {canManage ? (
+                <Button size="sm" onClick={() => setTicketOpen(true)} className="gap-2">
+                  <Plus className="size-4" />
+                  Create Ticket
+                </Button>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             {maintenanceByStatus.map((group) => (
@@ -250,7 +292,16 @@ export default function MaintenancePage() {
                             <TableCell>
                               <StatusBadge status={record.status} />
                             </TableCell>
-                            <TableCell className="max-w-[360px] truncate text-sm text-muted-foreground">{noteValue || "—"}</TableCell>
+                            <TableCell className="max-w-[360px] text-sm text-muted-foreground">
+                              <div className="flex items-center gap-2">
+                                <span className="truncate">{noteValue || "—"}</span>
+                                {record.aiCorrelationId ? (
+                                  <Badge variant="secondary" className="shrink-0 text-xs">
+                                    AI · Rec #{record.aiCorrelationId}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <Button size="sm" variant="outline" onClick={() => setNoteDialogId(record.id)}>
@@ -414,6 +465,73 @@ export default function MaintenancePage() {
               Done
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Ticket Dialog */}
+      <Dialog open={ticketOpen} onOpenChange={setTicketOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Maintenance Ticket</DialogTitle>
+            <DialogDescription>Schedule a new maintenance record for an asset.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTicket} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Asset *</Label>
+              <Select value={ticketAssetId} onValueChange={(v) => v && setTicketAssetId(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select asset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assets.filter((a) => a.status !== "retired").map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name} ({a.id})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Type *</Label>
+                <Select value={ticketType} onValueChange={(v) => v && setTicketType(v as typeof ticketType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scheduled">Scheduled</SelectItem>
+                    <SelectItem value="risk_based">Risk Based</SelectItem>
+                    <SelectItem value="warranty">Warranty</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Priority *</Label>
+                <Select value={ticketPriority} onValueChange={(v) => v && setTicketPriority(v as typeof ticketPriority)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ticket-date">Scheduled Date *</Label>
+              <Input id="ticket-date" type="date" value={ticketDate} onChange={(e) => setTicketDate(e.target.value)} required />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ticket-notes">Notes (optional)</Label>
+              <Textarea
+                id="ticket-notes"
+                value={ticketNotes}
+                onChange={(e) => setTicketNotes(e.target.value)}
+                rows={3}
+                placeholder="Describe the maintenance work..."
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setTicketOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={!ticketAssetId || !ticketDate}>Create Ticket</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </>

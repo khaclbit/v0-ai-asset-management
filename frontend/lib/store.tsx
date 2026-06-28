@@ -45,6 +45,7 @@ type StoreContextValue = {
   // maintenance data
   maintenanceRecords: MaintenanceRecord[]
   updateMaintenanceStatus: (id: string, update: { status: MaintenanceStatus; notes?: string }) => boolean
+  addMaintenanceRecord: (record: MaintenanceRecord) => void
   // warranty data
   warrantyRecords: WarrantyRecord[]
   // employees
@@ -99,7 +100,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateAsset = useCallback((id: string, patch: Partial<Asset>) => {
-    setAssets((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)))
+    setAssets((prev) =>
+      prev.map((a) =>
+        a.id === id
+          ? { ...a, ...patch, lastUpdated: new Date().toISOString().slice(0, 10) }
+          : a
+      )
+    )
   }, [])
 
   const retireAsset = useCallback((id: string) => {
@@ -190,6 +197,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return true
   }, [maintenanceRecords])
 
+  const addMaintenanceRecord = useCallback((record: MaintenanceRecord) => {
+    setMaintenanceRecords((prev) => [record, ...prev])
+  }, [])
+
   return (
     <StoreContext.Provider
       value={{
@@ -208,6 +219,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         closeAssignment,
         maintenanceRecords,
         updateMaintenanceStatus,
+        addMaintenanceRecord,
         warrantyRecords,
         employees,
       }}
