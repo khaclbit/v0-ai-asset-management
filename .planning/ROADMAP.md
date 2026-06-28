@@ -404,8 +404,8 @@ Plans:
 - [x] **Phase 20: Dashboard Refinement & Design System Hardening** — Align dashboard to WIREFRAMES.md §2 layout, add Asset Health, AI Risk Distribution, Recent Alerts, Maintenance Schedule, Equipment Status widgets; harden all cross-cutting DX requirements
 - [ ] **Phase 21: Asset, Assignment & Maintenance Refinement** — Extend all three existing v1.1 pages to match WIREFRAMES.md §3–§5: add missing columns, overdue derived state, full assignment state lifecycle UI, maintenance state transitions
 - [ ] **Phase 22: IoT Monitoring Page** — Build `/dashboard/iot` page with device grid, sensor value chips, per-sensor telemetry charts with threshold reference lines (WIREFRAMES_2.md §6)
-- [ ] **Phase 23: AI Predictive Maintenance Page** — Build `/dashboard/ai` page (fix `/predictive` route gap), health score leaderboard, recommendation cards with Approve/Defer workflow (WIREFRAMES_2.md §7)
-- [ ] **Phase 24: Notifications, Audit Log & User Management** — Build `/dashboard/notifications` inbox, `/dashboard/audit` append-only log, `/dashboard/users` admin-only user management (WIREFRAMES_2.md §8–§10)
+- [x] **Phase 23: AI Predictive Maintenance Page** — Build `/dashboard/ai` page (fix `/predictive` route gap), health score leaderboard, recommendation cards with Approve/Defer workflow (WIREFRAMES_2.md §7)
+- [x] **Phase 24: Notifications, Audit Log & User Management** — Build `/dashboard/notifications` inbox, `/dashboard/audit` append-only log, `/dashboard/users` admin-only user management (WIREFRAMES_2.md §8–§10)
 
 ---
 
@@ -525,27 +525,27 @@ Plans:
 | IOT-03 | Phase 22 | Pending |
 | IOT-04 | Phase 22 | Pending |
 | IOT-05 | Phase 22 | Pending |
-| AIPM-01 | Phase 23 | Pending |
-| AIPM-02 | Phase 23 | Pending |
-| AIPM-03 | Phase 23 | Pending |
-| AIPM-04 | Phase 23 | Pending |
-| AIPM-05 | Phase 23 | Pending |
-| AIPM-06 | Phase 23 | Pending |
-| AIPM-07 | Phase 23 | Pending |
-| NOTIF-01 | Phase 24 | Pending |
-| NOTIF-02 | Phase 24 | Pending |
-| NOTIF-03 | Phase 24 | Pending |
-| NOTIF-04 | Phase 24 | Pending |
-| NOTIF-05 | Phase 24 | Pending |
-| AUDIT-01 | Phase 24 | Pending |
-| AUDIT-02 | Phase 24 | Pending |
-| AUDIT-03 | Phase 24 | Pending |
-| AUDIT-04 | Phase 24 | Pending |
-| USER-01 | Phase 24 | Pending |
-| USER-02 | Phase 24 | Pending |
-| USER-03 | Phase 24 | Pending |
-| USER-04 | Phase 24 | Pending |
-| USER-05 | Phase 24 | Pending |
+| AIPM-01 | Phase 23 | ✅ Complete |
+| AIPM-02 | Phase 23 | ✅ Complete |
+| AIPM-03 | Phase 23 | ✅ Complete |
+| AIPM-04 | Phase 23 | ✅ Complete |
+| AIPM-05 | Phase 23 | ✅ Complete |
+| AIPM-06 | Phase 23 | ✅ Complete |
+| AIPM-07 | Phase 23 | ✅ Complete |
+| NOTIF-01 | Phase 24 | ✅ Complete |
+| NOTIF-02 | Phase 24 | ✅ Complete |
+| NOTIF-03 | Phase 24 | ✅ Complete |
+| NOTIF-04 | Phase 24 | ✅ Complete |
+| NOTIF-05 | Phase 24 | ✅ Complete |
+| AUDIT-01 | Phase 24 | ✅ Complete |
+| AUDIT-02 | Phase 24 | ✅ Complete |
+| AUDIT-03 | Phase 24 | ✅ Complete |
+| AUDIT-04 | Phase 24 | ✅ Complete |
+| USER-01 | Phase 24 | ✅ Complete |
+| USER-02 | Phase 24 | ✅ Complete |
+| USER-03 | Phase 24 | ✅ Complete |
+| USER-04 | Phase 24 | ✅ Complete |
+| USER-05 | Phase 24 | ✅ Complete |
 
 **v1.3 Coverage: 42/42 requirements mapped ✓**
 

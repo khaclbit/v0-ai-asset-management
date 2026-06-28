@@ -13,6 +13,8 @@ import {
   type WarrantyRecord,
   type Employee,
   type UserRole,
+  SEED_NOTIFICATIONS,
+  type AppNotification,
   type MaintenanceStatus,
 } from "@/lib/data"
 import { canTransitionMaintenance, requiresBlockedNote } from "@/lib/maintenance-warranty"
@@ -46,6 +48,11 @@ type StoreContextValue = {
   maintenanceRecords: MaintenanceRecord[]
   updateMaintenanceStatus: (id: string, update: { status: MaintenanceStatus; notes?: string }) => boolean
   addMaintenanceRecord: (record: MaintenanceRecord) => void
+  // notifications
+  notifications: AppNotification[]
+  unreadCount: number
+  markNotificationRead: (id: string) => void
+  markAllNotificationsRead: () => void
   // warranty data
   warrantyRecords: WarrantyRecord[]
   // employees
@@ -87,6 +94,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [assignmentRecords, setAssignmentRecords] = useState<AssignmentRecord[]>(seedAssignments)
   const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>(seedMaintenance)
   const [warrantyRecords] = useState<WarrantyRecord[]>(seedWarranty)
+
+  const [notifications, setNotifications] = useState<AppNotification[]>(SEED_NOTIFICATIONS)
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length
+
+  const markNotificationRead = useCallback((id: string) => {
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n))
+  }, [])
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+  }, [])
 
   const login = useCallback((email: string, role: UserRole) => {
     const base = DEMO_USERS[role]
@@ -220,6 +239,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         maintenanceRecords,
         updateMaintenanceStatus,
         addMaintenanceRecord,
+        notifications,
+        unreadCount,
+        markNotificationRead,
+        markAllNotificationsRead,
         warrantyRecords,
         employees,
       }}

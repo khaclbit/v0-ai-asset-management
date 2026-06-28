@@ -554,3 +554,108 @@ export function failureRisk(asset: Asset): { score: number; level: "Low" | "Medi
   return { score, level }
 }
 
+// ─── Notifications Domain ─────────────────────────────────────────────
+
+export type NotificationType =
+  | "high_failure_risk"
+  | "warranty_expiry"
+  | "upcoming_maintenance"
+  | "overdue_return"
+
+export type AppNotification = {
+  id: string
+  type: NotificationType
+  title: string
+  message: string
+  isRead: boolean
+  createdAt: string
+  href?: string
+}
+
+export const SEED_NOTIFICATIONS: AppNotification[] = [
+  {
+    id: "NOTIF-001",
+    type: "high_failure_risk",
+    title: "High failure risk detected",
+    message: "Forklift Unit A has a failure risk of 91%. Immediate maintenance review recommended.",
+    isRead: false,
+    createdAt: "2025-07-10T08:00:00.000Z",
+    href: "/dashboard/ai",
+  },
+  {
+    id: "NOTIF-002",
+    type: "warranty_expiry",
+    title: "Warranty expiring soon",
+    message: "Dell Laptop #3 warranty expires in 22 days (2025-08-01). Schedule maintenance before expiry.",
+    isRead: false,
+    createdAt: "2025-07-09T14:30:00.000Z",
+    href: "/dashboard/assets",
+  },
+  {
+    id: "NOTIF-003",
+    type: "upcoming_maintenance",
+    title: "Scheduled maintenance due",
+    message: "HP LaserJet Pro M404 is due for preventive maintenance on 2025-07-20.",
+    isRead: false,
+    createdAt: "2025-07-08T09:15:00.000Z",
+    href: "/dashboard/maintenance",
+  },
+  {
+    id: "NOTIF-004",
+    type: "overdue_return",
+    title: "Asset return overdue",
+    message: "Dell Laptop #1 was due for return by 2025-06-30. Please follow up with Alex Carter.",
+    isRead: true,
+    createdAt: "2025-07-01T07:00:00.000Z",
+    href: "/dashboard/assignments",
+  },
+  {
+    id: "NOTIF-005",
+    type: "high_failure_risk",
+    title: "High failure risk detected",
+    message: "Cisco Network Switch failure risk increased to 78%. Inspect cooling and power supply.",
+    isRead: false,
+    createdAt: "2025-07-07T16:45:00.000Z",
+    href: "/dashboard/ai",
+  },
+  {
+    id: "NOTIF-006",
+    type: "warranty_expiry",
+    title: "Warranty expiring soon",
+    message: "Dell PowerEdge Server R740 warranty expires in 15 days (2025-07-25).",
+    isRead: true,
+    createdAt: "2025-07-05T11:00:00.000Z",
+    href: "/dashboard/assets",
+  },
+  {
+    id: "NOTIF-007",
+    type: "upcoming_maintenance",
+    title: "Scheduled maintenance due",
+    message: "Industrial Forklift B is due for quarterly servicing on 2025-07-22.",
+    isRead: false,
+    createdAt: "2025-07-03T08:30:00.000Z",
+    href: "/dashboard/maintenance",
+  },
+]
+
+// ─── User Management Domain ────────────────────────────────────────────
+
+export type ManagedUser = {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  department: string
+  isActive: boolean
+  createdAt: string
+}
+
+export const SEED_MANAGED_USERS: ManagedUser[] = [
+  { id: "USR-001", name: "Alex Carter",     email: "alex.carter@company.com",     role: "Admin",         department: "Engineering", isActive: true,  createdAt: "2023-01-15" },
+  { id: "USR-002", name: "Sarah Mitchell",  email: "sarah.mitchell@company.com",  role: "Asset Manager", department: "Finance",     isActive: true,  createdAt: "2023-02-20" },
+  { id: "USR-003", name: "James Walker",    email: "james.walker@company.com",    role: "Staff",         department: "Logistics",   isActive: true,  createdAt: "2023-03-10" },
+  { id: "USR-004", name: "Diana Pham",      email: "diana.pham@company.com",      role: "Staff",         department: "HR",          isActive: true,  createdAt: "2023-04-05" },
+  { id: "USR-005", name: "Michael Nguyen",  email: "michael.nguyen@company.com",  role: "Staff",         department: "Engineering", isActive: false, createdAt: "2023-05-18" },
+  { id: "USR-006", name: "Linda Torres",    email: "linda.torres@company.com",    role: "Auditor",       department: "Compliance",  isActive: true,  createdAt: "2023-06-12" },
+  { id: "USR-007", name: "Ryan Kim",        email: "ryan.kim@company.com",        role: "Asset Manager", department: "Operations",  isActive: true,  createdAt: "2024-01-08" },
+]
