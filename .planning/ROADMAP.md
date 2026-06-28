@@ -401,7 +401,7 @@ Plans:
 
 ## Phases
 
-- [ ] **Phase 20: Dashboard Refinement & Design System Hardening** — Align dashboard to WIREFRAMES.md §2 layout, add Asset Health, AI Risk Distribution, Recent Alerts, Maintenance Schedule, Equipment Status widgets; harden all cross-cutting DX requirements
+- [x] **Phase 20: Dashboard Refinement & Design System Hardening** — Align dashboard to WIREFRAMES.md §2 layout, add Asset Health, AI Risk Distribution, Recent Alerts, Maintenance Schedule, Equipment Status widgets; harden all cross-cutting DX requirements
 - [ ] **Phase 21: Asset, Assignment & Maintenance Refinement** — Extend all three existing v1.1 pages to match WIREFRAMES.md §3–§5: add missing columns, overdue derived state, full assignment state lifecycle UI, maintenance state transitions
 - [ ] **Phase 22: IoT Monitoring Page** — Build `/dashboard/iot` page with device grid, sensor value chips, per-sensor telemetry charts with threshold reference lines (WIREFRAMES_2.md §6)
 - [ ] **Phase 23: AI Predictive Maintenance Page** — Build `/dashboard/ai` page (fix `/predictive` route gap), health score leaderboard, recommendation cards with Approve/Defer workflow (WIREFRAMES_2.md §7)
@@ -495,17 +495,17 @@ Plans:
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DASH2-01 | Phase 20 | Pending |
-| DASH2-02 | Phase 20 | Pending |
-| DASH2-03 | Phase 20 | Pending |
-| DASH2-04 | Phase 20 | Pending |
-| DASH2-05 | Phase 20 | Pending |
-| DASH2-06 | Phase 20 | Pending |
-| DX-01 | Phase 20 | Pending |
-| DX-02 | Phase 20 | Pending |
-| DX-03 | Phase 20 | Pending |
-| DX-04 | Phase 20 | Pending |
-| DX-05 | Phase 20 | Pending |
+| DASH2-01 | Phase 20 | ✅ Complete |
+| DASH2-02 | Phase 20 | ✅ Complete |
+| DASH2-03 | Phase 20 | ✅ Complete |
+| DASH2-04 | Phase 20 | ✅ Complete |
+| DASH2-05 | Phase 20 | ✅ Complete |
+| DASH2-06 | Phase 20 | ✅ Complete |
+| DX-01 | Phase 20 | ✅ Complete |
+| DX-02 | Phase 20 | ✅ Complete |
+| DX-03 | Phase 20 | ✅ Complete |
+| DX-04 | Phase 20 | ✅ Complete |
+| DX-05 | Phase 20 | ✅ Complete |
 | ASSET2-01 | Phase 21 | Pending |
 | ASSET2-02 | Phase 21 | Pending |
 | ASSET2-03 | Phase 21 | Pending |

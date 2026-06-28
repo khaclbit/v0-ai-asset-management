@@ -45,6 +45,7 @@ const recommendations: PredictiveRecommendation[] = [
     assetId: "AS-5001",
     assetName: "Forklift A",
     risk: { level: "High", score: 91 },
+    healthScore: 9,
     confidence: { score: 0.9, band: "High" },
     topFactors: ["4 repair events", "35 operating hours/week", "5 years since purchase"],
     correlation_id: "CORR-PRED-AS-5001",

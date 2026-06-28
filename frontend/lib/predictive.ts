@@ -11,6 +11,7 @@ export type PredictiveRecommendation = {
     level: "Low" | "Medium" | "High"
     score: number
   }
+  healthScore: number // 100 - risk.score
   confidence: {
     score: number
     band: ConfidenceBand
@@ -20,6 +21,7 @@ export type PredictiveRecommendation = {
   created_at: string
   slaDueAt: string | null
   actionState: PredictiveActionState
+  deferReason?: string
 }
 
 export type HighRiskSlaState = {
@@ -99,6 +101,7 @@ export function buildRecommendations(assets: Asset[], now: Date = new Date()): P
         assetId: asset.id,
         assetName: asset.name,
         risk,
+        healthScore: Math.max(1, 100 - risk.score),
         confidence: {
           score: confidenceScore,
           band: confidenceBand,
