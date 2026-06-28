@@ -687,11 +687,11 @@ The `/403` page should:
 | # | Question | Status | Resolution |
 |---|----------|--------|------------|
 | Q1 | Is `/dashboard` (Dashboard Overview) the default route after login? | **RESOLVED** | Yes. All roles redirect to `/dashboard` post-login. Existing prototype confirms this behavior. |
-| Q2 | Do Staff users have a dedicated "My Assets" page or see the regular Asset List filtered by `assignee_id`? | **UNRESOLVED** | The cleaner UX is a single `/dashboard/assets` page with server-side filtering when `role === 'Staff'` — no separate route. However, a "My Assets" shortcut could be added to the Staff dashboard. **Needs product decision.** |
-| Q3 | Are Reports a top-level nav item or sub-items under each module? | **UNRESOLVED** | Two patterns: (a) single `/dashboard/reports` hub with tabs for Asset/Assignment/Maintenance reports — simpler navigation, (b) per-module report sub-pages under `/dashboard/assets/reports`, `/dashboard/maintenance/reports`, etc. — deeper hierarchy. **Recommendation: Pattern (a) — single Reports hub**. Needs confirmation. |
-| Q4 | Is Settings a dedicated route (`/dashboard/settings`) or a dropdown from the user avatar in the top bar? | **UNRESOLVED** | Both patterns are valid. Dropdown is more compact but harder to navigate back to. Dedicated route is more predictable. **Recommendation: Dedicated route `/dashboard/settings` with avatar dropdown as a shortcut link** — matches Azure Portal and Grafana patterns. Needs confirmation. |
-| Q5 | Does the IoT Monitoring page default to showing all assets or prompt to select one? | **UNRESOLVED** | If many assets are monitored, defaulting to an asset-selector sidebar is better UX. If ≤10 assets, a tile grid overview is fine. **Recommendation: Asset-selector sidebar with first asset pre-selected**. |
-| Q6 | Is the Notification Center a full page or a slide-out panel? | **UNRESOLVED** | Full page at `/dashboard/notifications` is more accessible and link-shareable. **Recommendation: Bell icon opens a dropdown (last 5 notifications) + "See all" link → `/dashboard/notifications` full page**. |
+| Q2 | Staff assets page | **RESOLVED**: Single /dashboard/assets filtered server-side — no dedicated route for Staff |
+| Q3 | Reports structure | **RESOLVED**: Single /dashboard/reports hub with tabs (Asset / Assignment / Maintenance) |
+| Q4 | Settings access | **RESOLVED**: Dedicated /dashboard/settings route + avatar dropdown shortcut link |
+| Q5 | IoT default view | **RESOLVED**: Asset-selector sidebar, first asset pre-selected |
+| Q6 | Notification Center | **RESOLVED**: Bell icon dropdown (last 5) + "See all" → /dashboard/notifications full page |
 
 ---
 
