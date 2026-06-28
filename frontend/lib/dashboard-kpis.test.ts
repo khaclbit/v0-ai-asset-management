@@ -5,9 +5,9 @@ describe("dashboard-kpis", () => {
   it("exposes exactly four required KPI labels", () => {
     expect(DASHBOARD_KPI_LABELS).toEqual([
       "Total Assets",
-      "Active Assignments",
-      "Assets in Maintenance",
-      "Warranty Expiring Soon",
+      "Assigned",
+      "In Maintenance",
+      "Available",
     ])
   })
 
@@ -19,16 +19,16 @@ describe("dashboard-kpis", () => {
     const kpis = buildDashboardKpis({
       totalAssets: 12,
       retiredAssets: 2,
-      activeAssignments: 4,
+      assignedAssets: 4,
       assetsInMaintenance: 1,
-      warrantyExpiringSoon: 3,
+      availableAssets: 3,
     })
 
     expect(kpis).toHaveLength(4)
     expect(kpis.map((kpi) => kpi.value)).toEqual(["12", "4", "1", "3"])
     expect(kpis[3]).toMatchObject({
-      label: "Warranty Expiring Soon",
-      hint: "<= 3 months remaining",
+      label: "Available",
+      hint: "Ready for assignment",
     })
   })
 })

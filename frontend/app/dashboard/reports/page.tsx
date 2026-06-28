@@ -3,6 +3,7 @@
 import { useMemo } from "react"
 
 import { Topbar } from "@/components/topbar"
+import { StatusBadge } from "@/components/status-badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
@@ -145,7 +146,7 @@ function AssignmentTable({
                 <TableRow key={record.id}>
                   <TableCell>{record.assetName}</TableCell>
                   <TableCell>{record.assignee}</TableCell>
-                  <TableCell>{record.status}</TableCell>
+                  <TableCell><StatusBadge status={record.status} /></TableCell>
                   <TableCell>{formatDate(record.returnDate ?? record.dueDate)}</TableCell>
                 </TableRow>
               ))
@@ -192,7 +193,7 @@ function MaintenanceTable({
               records.map((record) => (
                 <TableRow key={record.id}>
                   <TableCell>{record.assetName}</TableCell>
-                  <TableCell>{record.status}</TableCell>
+                  <TableCell><StatusBadge status={record.status} /></TableCell>
                   <TableCell>{formatDate(record.scheduledDate)}</TableCell>
                 </TableRow>
               ))

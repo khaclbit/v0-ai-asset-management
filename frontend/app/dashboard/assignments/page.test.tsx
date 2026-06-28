@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import AssignmentsPage from "@/app/dashboard/borrow/page"
+import AssignmentsPage from "@/app/dashboard/assignments/page"
 
 const storeMock = vi.hoisted(() => {
   const approveAssignment = vi.fn()

@@ -1,5 +1,5 @@
 export type DashboardKpi = {
-  key: "total_assets" | "active_assignments" | "assets_in_maintenance" | "warranty_expiring_soon"
+  key: "total_assets" | "assigned_assets" | "assets_in_maintenance" | "available_assets"
   label: string
   value: string
   hint: string
@@ -8,16 +8,16 @@ export type DashboardKpi = {
 export type DashboardKpiMetrics = {
   totalAssets: number
   retiredAssets: number
-  activeAssignments: number
+  assignedAssets: number
   assetsInMaintenance: number
-  warrantyExpiringSoon: number
+  availableAssets: number
 }
 
 export const DASHBOARD_KPI_LABELS = [
   "Total Assets",
-  "Active Assignments",
-  "Assets in Maintenance",
-  "Warranty Expiring Soon",
+  "Assigned",
+  "In Maintenance",
+  "Available",
 ] as const
 
 export function buildDashboardKpis(metrics: DashboardKpiMetrics): DashboardKpi[] {
@@ -29,22 +29,22 @@ export function buildDashboardKpis(metrics: DashboardKpiMetrics): DashboardKpi[]
       hint: `${metrics.retiredAssets} retired`,
     },
     {
-      key: "active_assignments",
-      label: "Active Assignments",
-      value: String(metrics.activeAssignments),
-      hint: "Assignments not yet returned",
+      key: "assigned_assets",
+      label: "Assigned",
+      value: String(metrics.assignedAssets),
+      hint: "Currently assigned to staff",
     },
     {
       key: "assets_in_maintenance",
-      label: "Assets in Maintenance",
+      label: "In Maintenance",
       value: String(metrics.assetsInMaintenance),
-      hint: "Assets requiring attention",
+      hint: "Requires attention",
     },
     {
-      key: "warranty_expiring_soon",
-      label: "Warranty Expiring Soon",
-      value: String(metrics.warrantyExpiringSoon),
-      hint: "<= 3 months remaining",
+      key: "available_assets",
+      label: "Available",
+      value: String(metrics.availableAssets),
+      hint: "Ready for assignment",
     },
   ]
 }

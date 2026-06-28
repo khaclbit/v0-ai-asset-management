@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, Clock3, Database, ShieldCheck, TrendingUp } from "lucide-react"
+import { AlertTriangle, Clock3, Database, TrendingUp } from "lucide-react"
 import { toast } from "sonner"
 
 import { AiTracePanel } from "@/components/ai-trace-panel"
@@ -134,14 +134,10 @@ export default function PredictivePage() {
                           </div>
                         ) : null}
 
-                        {recommendation.actionState === "approved" ? (
-                          <div className="flex items-center gap-2 rounded-md border border-chart-3/30 bg-chart-3/10 px-2 py-1.5 text-chart-3">
-                            <ShieldCheck className="size-4" />
-                            <p className="text-xs font-medium">Approved by Asset Manager</p>
-                          </div>
-                        ) : recommendation.actionState === "deferred" ? (
-                          <div className="rounded-md border border-chart-4/30 bg-chart-4/10 px-2 py-1.5 text-xs font-medium text-chart-4">
-                            Deferred by Asset Manager
+                        {(recommendation.actionState === "approved" || recommendation.actionState === "deferred") ? (
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={recommendation.actionState} />
+                            <span className="text-xs text-muted-foreground">by Asset Manager</span>
                           </div>
                         ) : null}
 
