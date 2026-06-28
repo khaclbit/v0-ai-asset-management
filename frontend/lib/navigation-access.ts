@@ -7,51 +7,16 @@ export type DashboardNavItem = {
 }
 
 export const DASHBOARD_NAV: DashboardNavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Overview",
-    roles: ["Admin", "Asset Manager", "Staff", "Auditor"],
-  },
-  {
-    href: "/dashboard/assets",
-    label: "Assets",
-    roles: ["Admin", "Asset Manager", "Staff", "Auditor"],
-  },
-  {
-    href: "/dashboard/borrow",
-    label: "Assignments",
-    roles: ["Admin", "Asset Manager", "Staff"],
-  },
-  {
-    href: "/dashboard/maintenance",
-    label: "Maintenance",
-    roles: ["Admin", "Asset Manager"],
-  },
-  {
-    href: "/dashboard/assistant",
-    label: "AI Assistant",
-    roles: ["Admin", "Asset Manager", "Staff", "Auditor"],
-  },
-  {
-    href: "/dashboard/ocr",
-    label: "OCR Intake",
-    roles: ["Admin", "Asset Manager"],
-  },
-  {
-    href: "/dashboard/predictive",
-    label: "Predictive",
-    roles: ["Admin", "Asset Manager"],
-  },
-  {
-    href: "/dashboard/reports",
-    label: "Reports",
-    roles: ["Admin", "Asset Manager", "Staff", "Auditor"],
-  },
-  {
-    href: "/dashboard/audit",
-    label: "Audit Log",
-    roles: ["Admin", "Auditor"],
-  },
+  { href: "/dashboard",               label: "Overview",        roles: ["Admin", "Asset Manager", "Staff"] },
+  { href: "/dashboard/assets",        label: "Assets",          roles: ["Admin", "Asset Manager", "Staff"] },
+  { href: "/dashboard/assignments",   label: "Assignments",     roles: ["Admin", "Asset Manager", "Staff"] },
+  { href: "/dashboard/maintenance",   label: "Maintenance",     roles: ["Admin", "Asset Manager"] },
+  { href: "/dashboard/iot",           label: "IoT Monitor",     roles: ["Admin", "Asset Manager"] },
+  { href: "/dashboard/ai",            label: "AI Predictive",   roles: ["Admin", "Asset Manager"] },
+  { href: "/dashboard/notifications", label: "Notifications",   roles: ["Admin", "Asset Manager", "Staff"] },
+  { href: "/dashboard/reports",       label: "Reports",         roles: ["Admin", "Asset Manager"] },
+  { href: "/dashboard/audit",         label: "Audit Log",       roles: ["Admin"] },
+  { href: "/dashboard/users",         label: "Users",           roles: ["Admin"] },
 ]
 
 function normalizePathname(pathname: string) {

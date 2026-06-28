@@ -13,23 +13,25 @@ import {
   ArrowLeftRight,
   Wrench,
   BarChart3,
-  Sparkles,
-  ScanLine,
   TrendingUp,
   ScrollText,
   LogOut,
+  MonitorSmartphone,
+  Bell,
+  Users,
 } from "lucide-react"
 
 const NAV_ICONS: Record<string, React.ElementType> = {
   "/dashboard": LayoutDashboard,
   "/dashboard/assets": Package,
-  "/dashboard/borrow": ArrowLeftRight,
+  "/dashboard/assignments": ArrowLeftRight,
   "/dashboard/maintenance": Wrench,
-  "/dashboard/assistant": Sparkles,
-  "/dashboard/ocr": ScanLine,
-  "/dashboard/predictive": TrendingUp,
+  "/dashboard/iot": MonitorSmartphone,
+  "/dashboard/ai": TrendingUp,
+  "/dashboard/notifications": Bell,
   "/dashboard/reports": BarChart3,
   "/dashboard/audit": ScrollText,
+  "/dashboard/users": Users,
 }
 
 export function Sidebar() {
@@ -57,7 +59,8 @@ export function Sidebar() {
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {visibleNav.map((item) => {
-          const active = pathname === item.href
+          const active = pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
           const Icon = NAV_ICONS[item.href]
           return (
             <Link
