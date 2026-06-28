@@ -19,6 +19,10 @@ const STYLES: Record<string, string> = {
   in_progress: "bg-chart-4/15 text-chart-4 border-chart-4/30",
   completed: "bg-chart-3/15 text-chart-3 border-chart-3/30",
   blocked: "bg-destructive/15 text-destructive border-destructive/30",
+  // AI Recommendation states
+  pending: "bg-chart-2/15 text-chart-2 border-chart-2/30",
+  approved: "bg-chart-3/15 text-chart-3 border-chart-3/30",
+  deferred: "bg-chart-4/15 text-chart-4 border-chart-4/30",
   // Warranty states
   expiring_soon: "bg-chart-4/15 text-chart-4 border-chart-4/30",
   expired: "bg-muted text-muted-foreground border-border",

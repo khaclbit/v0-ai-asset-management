@@ -388,7 +388,7 @@ For risk bands, add optional icon display using `size-3` Lucide icons:
 // Low risk: <ShieldCheck className="size-3" />
 ```
 
-> **Open Question OQ-3:** Whether to add icons to risk chips is UNRESOLVED. Recommendation: use icons for risk band chips only (High/Medium/Low) to improve scannability in data-dense tables; keep status chips text-only for cleanliness.
+> **Open Question OQ-3 | Risk band chip icons | **RESOLVED**: Icons on risk bands only — HIGH ⚠️ / MEDIUM ⚠️ / LOW ℹ️; lifecycle state chips use color only
 
 ### 4.6 Badge [VERIFIED: codebase — `components/ui/badge.tsx`]
 
@@ -691,8 +691,8 @@ Consistent with existing "no data" patterns used in asset list pages: dashed bor
 | OQ-1 | Font: Inter vs Roboto? | **RESOLVED** | **Geist Sans** — locked by existing codebase (`next/font/google` import in `layout.tsx`) |
 | OQ-2 | Primary brand color: `#0EA5E9` (sky blue from v1.1) vs darker enterprise blue | **RESOLVED** | **`#0864CD`** (oklch 0.52 0.18 257) — locked by existing `--primary` token. The current primary is a medium enterprise blue, darker and more corporate than sky-blue |
 | OQ-3 | Dark mode required? | **RESOLVED** | **Light mode only** for this academic project. Dark mode CSS rules exist in globals.css but are NOT a Phase 16 deliverable |
-| OQ-4 | Status chips: icons (⚠️) or color only? | **UNRESOLVED** | Recommendation: **icons for risk bands only** (High/Medium/Low) using `ShieldAlert`, `AlertTriangle`, `ShieldCheck` icons at `size-3`. Keep other status chips text-only |
-| OQ-5 | Should Phase 16 ADD a 6th chart color (`--chart-6`) to globals.css? | **RECOMMENDED YES** | Violet `oklch(0.65 0.14 300)` ≈ `#8B5CF6` for the 6th sensor type (Running Hours) |
+| OQ-4 | Status chips: icons or color only? | **RESOLVED** | Risk band chips use icons: HIGH ⚠️ / MEDIUM ⚠️ / LOW ℹ️; all lifecycle state chips are color-only |
+| OQ-5 | --chart-6 token | **RESOLVED**: Add --chart-6 violet (#8B5CF6) for 6th sensor type (running_hours)
 | OQ-6 | AI Recommendation states (pending/approved/deferred/expired) — currently NOT in `StatusBadge` STYLES map | **REQUIRES IMPLEMENTATION** | Add these 4 entries as specified in §4.5 |
 
 ---
