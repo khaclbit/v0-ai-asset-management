@@ -570,7 +570,7 @@ Plans:
 - [x] **Phase 26: Database Models & Migrations** — SQLAlchemy models for all four core entities, FK relationships, indexes, and Alembic initial migration that applies cleanly to a fresh DB (DB-01, DB-02, DB-03, DB-04, DB-05, DB-06)
 - [x] **Phase 27: Authentication & Authorization** — JWT login + refresh endpoints, /auth/me, bcrypt hashing, reusable `get_current_user` and `require_role` FastAPI dependencies (AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06)
 - [x] **Phase 28: Asset API** — Full CRUD asset endpoints with pagination/filtering, lifecycle state machine enforced server-side, retire action (ASSET-API-01, ASSET-API-02, ASSET-API-03, ASSET-API-04, ASSET-API-05, ASSET-API-06)
-- [ ] **Phase 29: User, Assignment & Maintenance APIs** — User management endpoints, assignment workflow (create/approve/reject/return), maintenance record CRUD (USER-API-01, USER-API-02, USER-API-03, USER-API-04, ASGN-API-01, ASGN-API-02, ASGN-API-03, ASGN-API-04, ASGN-API-05, MAINT-API-01, MAINT-API-02, MAINT-API-03)
+- [x] **Phase 29: User, Assignment & Maintenance APIs** — User management endpoints, assignment workflow (create/approve/reject/return), maintenance record CRUD (USER-API-01, USER-API-02, USER-API-03, USER-API-04, ASGN-API-01, ASGN-API-02, ASGN-API-03, ASGN-API-04, ASGN-API-05, MAINT-API-01, MAINT-API-02, MAINT-API-03)
 - [ ] **Phase 30: Frontend Wiring** — Replace all mock data with real API calls; auth flow, asset/assignment/maintenance/user pages wired; global store cleaned of seed arrays; loading and error states added (FE-WIRE-01, FE-WIRE-02, FE-WIRE-03, FE-WIRE-04, FE-WIRE-05, FE-WIRE-06, FE-WIRE-07)
 
 ---
@@ -693,18 +693,18 @@ Plans:
 | ASSET-API-04 | PATCH /api/v1/assets/{id} | Phase 28 | ✅ Complete |
 | ASSET-API-05 | POST /api/v1/assets/{id}/retire | Phase 28 | ✅ Complete |
 | ASSET-API-06 | Lifecycle state machine enforced server-side | Phase 28 | ✅ Complete |
-| USER-API-01 | GET /api/v1/users | Phase 29 | Pending |
-| USER-API-02 | POST /api/v1/users | Phase 29 | Pending |
-| USER-API-03 | PATCH /api/v1/users/{id}/role | Phase 29 | Pending |
-| USER-API-04 | POST /api/v1/users/{id}/deactivate | Phase 29 | Pending |
-| ASGN-API-01 | GET /api/v1/assignments | Phase 29 | Pending |
-| ASGN-API-02 | POST /api/v1/assignments | Phase 29 | Pending |
-| ASGN-API-03 | POST /api/v1/assignments/{id}/approve | Phase 29 | Pending |
-| ASGN-API-04 | POST /api/v1/assignments/{id}/reject | Phase 29 | Pending |
-| ASGN-API-05 | POST /api/v1/assignments/{id}/return | Phase 29 | Pending |
-| MAINT-API-01 | GET /api/v1/maintenance | Phase 29 | Pending |
-| MAINT-API-02 | POST /api/v1/maintenance | Phase 29 | Pending |
-| MAINT-API-03 | PATCH /api/v1/maintenance/{id}/status | Phase 29 | Pending |
+| USER-API-01 | GET /api/v1/users | Phase 29 | ✅ Complete |
+| USER-API-02 | POST /api/v1/users | Phase 29 | ✅ Complete |
+| USER-API-03 | PATCH /api/v1/users/{id}/role | Phase 29 | ✅ Complete |
+| USER-API-04 | POST /api/v1/users/{id}/deactivate | Phase 29 | ✅ Complete |
+| ASGN-API-01 | GET /api/v1/assignments | Phase 29 | ✅ Complete |
+| ASGN-API-02 | POST /api/v1/assignments | Phase 29 | ✅ Complete |
+| ASGN-API-03 | POST /api/v1/assignments/{id}/approve | Phase 29 | ✅ Complete |
+| ASGN-API-04 | POST /api/v1/assignments/{id}/reject | Phase 29 | ✅ Complete |
+| ASGN-API-05 | POST /api/v1/assignments/{id}/return | Phase 29 | ✅ Complete |
+| MAINT-API-01 | GET /api/v1/maintenance | Phase 29 | ✅ Complete |
+| MAINT-API-02 | POST /api/v1/maintenance | Phase 29 | ✅ Complete |
+| MAINT-API-03 | PATCH /api/v1/maintenance/{id}/status | Phase 29 | ✅ Complete |
 | FE-WIRE-01 | lib/api.ts apiFetch wrapper | Phase 30 | Pending |
 | FE-WIRE-02 | Auth flow wired (login, JWT storage, /auth/me) | Phase 30 | Pending |
 | FE-WIRE-03 | Asset pages wired | Phase 30 | Pending |
