@@ -551,3 +551,169 @@ Plans:
 
 ---
 *v1.3 roadmap appended: 2026-06-28 for milestone v1.3 Frontend UI Implementation*
+
+
+---
+
+## v2.0 Backend Foundation
+
+**Goal:** Build a production-grade FastAPI + PostgreSQL backend with a Docker Compose dev environment, JWT/RBAC authentication, and core domain APIs — then wire the existing Next.js frontend to consume real data in place of all mock/seed arrays.
+**Phases:** 25–30
+**Total Requirements:** 42
+**Continues from:** Phase 24 (v1.3 Frontend UI Implementation — complete)
+
+---
+
+### Phase Sequence
+
+- [ ] **Phase 25: Backend Scaffold & Docker Environment** — FastAPI project structure, Docker Compose stack, environment configuration, Alembic init, pinned deps, and idempotent seed script (ENV-01, ENV-02, ENV-03, ENV-04, ENV-05, ENV-06)
+- [ ] **Phase 26: Database Models & Migrations** — SQLAlchemy models for all four core entities, FK relationships, indexes, and Alembic initial migration that applies cleanly to a fresh DB (DB-01, DB-02, DB-03, DB-04, DB-05, DB-06)
+- [ ] **Phase 27: Authentication & Authorization** — JWT login + refresh endpoints, /auth/me, bcrypt hashing, reusable `get_current_user` and `require_role` FastAPI dependencies (AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06)
+- [ ] **Phase 28: Asset API** — Full CRUD asset endpoints with pagination/filtering, lifecycle state machine enforced server-side, retire action (ASSET-API-01, ASSET-API-02, ASSET-API-03, ASSET-API-04, ASSET-API-05, ASSET-API-06)
+- [ ] **Phase 29: User, Assignment & Maintenance APIs** — User management endpoints, assignment workflow (create/approve/reject/return), maintenance record CRUD (USER-API-01, USER-API-02, USER-API-03, USER-API-04, ASGN-API-01, ASGN-API-02, ASGN-API-03, ASGN-API-04, ASGN-API-05, MAINT-API-01, MAINT-API-02, MAINT-API-03)
+- [ ] **Phase 30: Frontend Wiring** — Replace all mock data with real API calls; auth flow, asset/assignment/maintenance/user pages wired; global store cleaned of seed arrays; loading and error states added (FE-WIRE-01, FE-WIRE-02, FE-WIRE-03, FE-WIRE-04, FE-WIRE-05, FE-WIRE-06, FE-WIRE-07)
+
+---
+
+### Phase Details
+
+#### Phase 25: Backend Scaffold & Docker Environment
+**Goal:** The backend project exists as a runnable FastAPI application inside Docker Compose, with all environment variables documented and an idempotent seed script that creates the first Admin user.
+**Depends on:** Phase 24 (v1.3 complete — frontend codebase is the base)
+**Requirements:** ENV-01, ENV-02, ENV-03, ENV-04, ENV-05, ENV-06
+**Success Criteria** (what must be TRUE):
+  1. `docker compose up` starts three services (api, db, pgadmin) without errors and api responds at `http://localhost:8000/docs`
+  2. `backend/.env.example` lists every required env var with descriptions; copying it to `.env` is sufficient to boot the stack
+  3. Alembic is initialized at `backend/alembic/` and `alembic upgrade head` runs against the Dockerised DB without error
+  4. `python backend/seed.py` run twice produces exactly one Admin user (idempotent)
+  5. `requirements.txt` contains all deps with pinned versions and installs cleanly in a fresh virtualenv
+**Plans:** TBD
+
+---
+
+#### Phase 26: Database Models & Migrations
+**Goal:** All core domain entities are persisted in PostgreSQL via SQLAlchemy ORM models, wired with correct FK relationships and indexes, and a single Alembic migration captures the full initial schema.
+**Depends on:** Phase 25
+**Requirements:** DB-01, DB-02, DB-03, DB-04, DB-05, DB-06
+**Success Criteria** (what must be TRUE):
+  1. `alembic upgrade head` on a blank database creates tables: `users`, `assets`, `assignments`, `maintenance_records` with no errors
+  2. Inserting a row into `assignments` with an invalid `asset_id` or `user_id` raises a FK constraint violation at the DB level
+  3. `alembic downgrade base` cleanly drops all tables (migration is reversible)
+  4. Query plans for common filters (asset status, user id) show index scans, not sequential scans
+**Plans:** TBD
+
+---
+
+#### Phase 27: Authentication & Authorization
+**Goal:** Users can log in with bcrypt-hashed credentials and receive JWT access + refresh tokens; every protected endpoint can enforce identity and role via reusable FastAPI dependencies.
+**Depends on:** Phase 26
+**Requirements:** AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06
+**Success Criteria** (what must be TRUE):
+  1. `POST /api/v1/auth/login` with valid credentials returns `access_token` + `refresh_token`; invalid credentials return 401
+  2. `POST /api/v1/auth/refresh` with a valid refresh token returns a new access token; expired/invalid tokens return 401
+  3. `GET /api/v1/auth/me` with a valid Bearer token returns the authenticated user's profile; missing/invalid token returns 401
+  4. Any endpoint decorated with `require_role("Admin")` returns 403 when called by a non-Admin authenticated user
+  5. Passwords stored in the database are bcrypt hashes — never plaintext
+**Plans:** TBD
+
+---
+
+#### Phase 28: Asset API
+**Goal:** Admin and Staff users can create, view, update, and retire assets through a RESTful API that enforces a server-side lifecycle state machine — invalid transitions are rejected.
+**Depends on:** Phase 27
+**Requirements:** ASSET-API-01, ASSET-API-02, ASSET-API-03, ASSET-API-04, ASSET-API-05, ASSET-API-06
+**Success Criteria** (what must be TRUE):
+  1. `GET /api/v1/assets` returns a paginated list; filtering by `status`, `category`, or `search` narrows results correctly
+  2. `POST /api/v1/assets` creates an asset and returns 201 with the new resource; required-field violations return 422
+  3. `GET /api/v1/assets/{id}` returns the asset or 404 if not found
+  4. `PATCH /api/v1/assets/{id}` updates allowed fields; attempting to set an illegal status directly returns 422
+  5. `POST /api/v1/assets/{id}/retire` transitions asset to `Retired` status; calling retire on an already-retired asset returns 409
+  6. Any state-machine transition not defined in the lifecycle (e.g. Retired → Available) is rejected with a 422 and a descriptive error message
+**Plans:** TBD
+
+---
+
+#### Phase 29: User, Assignment & Maintenance APIs
+**Goal:** Admins can manage users and approve/reject assignment requests; staff can request assignments and log maintenance records — all through authenticated, role-gated REST endpoints.
+**Depends on:** Phase 28
+**Requirements:** USER-API-01, USER-API-02, USER-API-03, USER-API-04, ASGN-API-01, ASGN-API-02, ASGN-API-03, ASGN-API-04, ASGN-API-05, MAINT-API-01, MAINT-API-02, MAINT-API-03
+**Success Criteria** (what must be TRUE):
+  1. `GET /api/v1/users` (Admin only) returns all users; a Staff token receives 403
+  2. `POST /api/v1/users` creates a user with hashed password; duplicate email returns 409
+  3. `PATCH /api/v1/users/{id}/role` and `POST /api/v1/users/{id}/deactivate` alter the user record and are reflected in subsequent GET calls
+  4. `POST /api/v1/assignments` creates a Pending assignment; approving it via `POST /api/v1/assignments/{id}/approve` transitions it to Approved and marks the asset as Assigned
+  5. `POST /api/v1/assignments/{id}/return` transitions assignment to Returned and asset back to Available
+  6. `POST /api/v1/maintenance` creates a maintenance record linked to an asset; `PATCH /api/v1/maintenance/{id}/status` updates its status and the change persists
+**Plans:** TBD
+
+---
+
+#### Phase 30: Frontend Wiring
+**Goal:** The Next.js frontend communicates exclusively with the real FastAPI backend — all mock/seed arrays are removed, auth tokens are managed correctly, and every page reflects live database state with proper loading and error feedback.
+**Depends on:** Phase 29
+**Requirements:** FE-WIRE-01, FE-WIRE-02, FE-WIRE-03, FE-WIRE-04, FE-WIRE-05, FE-WIRE-06, FE-WIRE-07
+**Success Criteria** (what must be TRUE):
+  1. `lib/api.ts` exports an `apiFetch` wrapper that attaches the JWT Bearer token to every request and handles 401 by redirecting to login
+  2. A user can log in via the UI, refresh the page, and remain authenticated (token persisted correctly); logging out clears the token
+  3. Asset list, detail, and create/edit forms display real DB data; creating an asset via the form appears in the list without a page reload
+  4. Assignment request, approve, reject, and return actions all call the API and update the UI to reflect the new state
+  5. Maintenance records load from the API; creating a new record appears immediately in the list
+  6. The User Management page lists real users; role changes and deactivation are reflected after the API call completes
+  7. No hardcoded seed arrays remain in the global store; loading states and error messages are displayed for every async operation
+**Plans:** TBD
+**UI hint**: yes
+
+---
+
+### Requirement → Phase Mapping
+
+| Requirement | Description | Phase | Status |
+|-------------|-------------|-------|--------|
+| ENV-01 | Backend project scaffolded under `backend/` | Phase 25 | Pending |
+| ENV-02 | docker-compose.yml at project root | Phase 25 | Pending |
+| ENV-03 | backend/.env.example documented | Phase 25 | Pending |
+| ENV-04 | Alembic initialized under backend/alembic/ | Phase 25 | Pending |
+| ENV-05 | requirements.txt with pinned deps | Phase 25 | Pending |
+| ENV-06 | backend/seed.py creates first Admin user, idempotent | Phase 25 | Pending |
+| DB-01 | SQLAlchemy User model | Phase 26 | Pending |
+| DB-02 | SQLAlchemy Asset model | Phase 26 | Pending |
+| DB-03 | SQLAlchemy Assignment model | Phase 26 | Pending |
+| DB-04 | SQLAlchemy MaintenanceRecord model | Phase 26 | Pending |
+| DB-05 | Alembic initial migration applies cleanly | Phase 26 | Pending |
+| DB-06 | FK relationships + indexes | Phase 26 | Pending |
+| AUTH-01 | POST /api/v1/auth/login | Phase 27 | Pending |
+| AUTH-02 | POST /api/v1/auth/refresh | Phase 27 | Pending |
+| AUTH-03 | GET /api/v1/auth/me | Phase 27 | Pending |
+| AUTH-04 | get_current_user dependency | Phase 27 | Pending |
+| AUTH-05 | require_role dependency | Phase 27 | Pending |
+| AUTH-06 | bcrypt password hashing | Phase 27 | Pending |
+| ASSET-API-01 | GET /api/v1/assets (paginated, filterable) | Phase 28 | Pending |
+| ASSET-API-02 | POST /api/v1/assets | Phase 28 | Pending |
+| ASSET-API-03 | GET /api/v1/assets/{id} | Phase 28 | Pending |
+| ASSET-API-04 | PATCH /api/v1/assets/{id} | Phase 28 | Pending |
+| ASSET-API-05 | POST /api/v1/assets/{id}/retire | Phase 28 | Pending |
+| ASSET-API-06 | Lifecycle state machine enforced server-side | Phase 28 | Pending |
+| USER-API-01 | GET /api/v1/users | Phase 29 | Pending |
+| USER-API-02 | POST /api/v1/users | Phase 29 | Pending |
+| USER-API-03 | PATCH /api/v1/users/{id}/role | Phase 29 | Pending |
+| USER-API-04 | POST /api/v1/users/{id}/deactivate | Phase 29 | Pending |
+| ASGN-API-01 | GET /api/v1/assignments | Phase 29 | Pending |
+| ASGN-API-02 | POST /api/v1/assignments | Phase 29 | Pending |
+| ASGN-API-03 | POST /api/v1/assignments/{id}/approve | Phase 29 | Pending |
+| ASGN-API-04 | POST /api/v1/assignments/{id}/reject | Phase 29 | Pending |
+| ASGN-API-05 | POST /api/v1/assignments/{id}/return | Phase 29 | Pending |
+| MAINT-API-01 | GET /api/v1/maintenance | Phase 29 | Pending |
+| MAINT-API-02 | POST /api/v1/maintenance | Phase 29 | Pending |
+| MAINT-API-03 | PATCH /api/v1/maintenance/{id}/status | Phase 29 | Pending |
+| FE-WIRE-01 | lib/api.ts apiFetch wrapper | Phase 30 | Pending |
+| FE-WIRE-02 | Auth flow wired (login, JWT storage, /auth/me) | Phase 30 | Pending |
+| FE-WIRE-03 | Asset pages wired | Phase 30 | Pending |
+| FE-WIRE-04 | Assignment pages wired | Phase 30 | Pending |
+| FE-WIRE-05 | Maintenance page wired | Phase 30 | Pending |
+| FE-WIRE-06 | User Management page wired | Phase 30 | Pending |
+| FE-WIRE-07 | Global store refactored (remove seed arrays, add loading/error states) | Phase 30 | Pending |
+
+**v2.0 Coverage: 42/42 requirements mapped ✓**
+
+---
+*v2.0 roadmap appended: 2026-06-30 for milestone v2.0 Backend Foundation*

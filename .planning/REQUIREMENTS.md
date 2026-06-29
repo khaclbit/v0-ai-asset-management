@@ -398,4 +398,92 @@ Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-10*
-*Last updated: 2026-06-28 after v1.3 milestone start*
+*Last updated: 2026-06-30 after v2.0 milestone start*
+
+---
+
+## v2.0 Requirements — Backend Foundation
+
+Requirements for the v2.0 Backend Foundation milestone. Target: FastAPI + PostgreSQL + Docker Compose + JWT/RBAC + core domain APIs + frontend wiring.
+
+### Project Structure & Environment
+
+- [ ] **ENV-01**: Backend project scaffolded under `backend/` with FastAPI structure: `app/routers/`, `app/models/`, `app/schemas/`, `app/services/`, `app/dependencies.py`, `app/config.py`, `main.py`
+- [ ] **ENV-02**: `docker-compose.yml` at project root defines 3 services: `api` (FastAPI + uvicorn --reload), `db` (PostgreSQL 16), `pgadmin` (pgAdmin 4) with volume mounts and env-var injection
+- [ ] **ENV-03**: `backend/.env.example` documents all required env vars: `DATABASE_URL`, `SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `ALGORITHM`, `FIRST_ADMIN_EMAIL`, `FIRST_ADMIN_PASSWORD`
+- [ ] **ENV-04**: Alembic initialized under `backend/alembic/`; `alembic.ini` points to DATABASE_URL via env var; `env.py` imports all SQLAlchemy models for auto-detection
+- [ ] **ENV-05**: `backend/requirements.txt` (or `pyproject.toml`) pins: `fastapi`, `uvicorn[standard]`, `sqlalchemy`, `alembic`, `psycopg2-binary`, `python-jose[cryptography]`, `passlib[bcrypt]`, `python-multipart`, `python-dotenv`
+- [ ] **ENV-06**: `backend/seed.py` script creates one Admin user on first run; idempotent (safe to re-run)
+
+### Database Models & Migrations
+
+- [ ] **DB-01**: SQLAlchemy `User` model: id (UUID), email, hashed_password, full_name, role (enum: Admin/Asset Manager/Staff/Auditor), department, is_active, created_at
+- [ ] **DB-02**: SQLAlchemy `Asset` model: id (UUID), name, category (enum), status (enum: registered/available/assigned/maintenance/retired), location, assignee_id (FK User), purchase_date, purchase_price, warranty_months, repair_count, usage_hours_per_week, sensor_device_id, last_updated, notes
+- [ ] **DB-03**: SQLAlchemy `Assignment` model: id (UUID), asset_id (FK), assignee_id (FK User), status (enum: requested/active/rejected/closed), requested_date, approved_date, expected_return_date, return_date, reject_reason, notes
+- [ ] **DB-04**: SQLAlchemy `MaintenanceRecord` model: id (UUID), asset_id (FK), title, description, status (enum: scheduled/in_progress/completed/blocked), scheduled_date, completed_date, notes, blocked_reason, ai_correlation_id
+- [ ] **DB-05**: Alembic `initial` migration generated and applies cleanly against a fresh PostgreSQL instance
+- [ ] **DB-06**: All FK relationships defined with `ondelete="SET NULL"` or `ondelete="RESTRICT"` per business rules; indexes on asset_id, assignee_id in assignment + maintenance tables
+
+### Authentication & Authorization
+
+- [ ] **AUTH-01**: `POST /api/v1/auth/login` accepts `{email, password}`, returns `{access_token, token_type}` (JWT, 30-min expiry)
+- [ ] **AUTH-02**: `POST /api/v1/auth/refresh` accepts a valid access token, returns a new token
+- [ ] **AUTH-03**: `GET /api/v1/auth/me` returns current authenticated user's profile
+- [ ] **AUTH-04**: FastAPI dependency `get_current_user` validates JWT on every protected route; returns 401 if missing/invalid/expired
+- [ ] **AUTH-05**: Role-checking dependency `require_role(*roles)` returns 403 if authenticated user's role is not in the allowed set
+- [ ] **AUTH-06**: Passwords hashed with bcrypt via passlib; plain-text password never stored or logged
+
+### Asset API
+
+- [ ] **ASSET-API-01**: `GET /api/v1/assets` — paginated list (page, size); filterable by status and category; returns `AssetResponse[]`
+- [ ] **ASSET-API-02**: `POST /api/v1/assets` — create asset; Admin/Asset Manager only; validates category enum
+- [ ] **ASSET-API-03**: `GET /api/v1/assets/{id}` — single asset with full detail
+- [ ] **ASSET-API-04**: `PATCH /api/v1/assets/{id}` — partial update; Admin/Asset Manager only
+- [ ] **ASSET-API-05**: `POST /api/v1/assets/{id}/retire` — transitions asset to `retired` status; Admin only; returns 409 if asset has active assignment
+- [ ] **ASSET-API-06**: Asset lifecycle state machine enforced server-side: only valid transitions allowed (e.g., cannot assign a `retired` asset)
+
+### User Management API
+
+- [ ] **USER-API-01**: `GET /api/v1/users` — list all users; Admin only; supports is_active filter
+- [ ] **USER-API-02**: `POST /api/v1/users` — create user; Admin only; hashes password, sets is_active=true
+- [ ] **USER-API-03**: `PATCH /api/v1/users/{id}/role` — change user role; Admin only; cannot demote own Admin account
+- [ ] **USER-API-04**: `POST /api/v1/users/{id}/deactivate` — soft-delete (is_active=false); Admin only; cannot deactivate own account
+
+### Assignment API
+
+- [ ] **ASGN-API-01**: `GET /api/v1/assignments` — list assignments; filter by status, asset_id, assignee_id; paginated
+- [ ] **ASGN-API-02**: `POST /api/v1/assignments` — Staff/any role can request; sets status=requested, records assignee_id from request body
+- [ ] **ASGN-API-03**: `POST /api/v1/assignments/{id}/approve` — Asset Manager/Admin only; transitions to active, sets asset.status=assigned
+- [ ] **ASGN-API-04**: `POST /api/v1/assignments/{id}/reject` — Asset Manager/Admin only; records reject_reason; sets status=rejected
+- [ ] **ASGN-API-05**: `POST /api/v1/assignments/{id}/return` — closes assignment; sets status=closed, asset.status=available, records return_date
+
+### Maintenance API
+
+- [ ] **MAINT-API-01**: `GET /api/v1/maintenance` — list tickets; filter by status, asset_id; paginated
+- [ ] **MAINT-API-02**: `POST /api/v1/maintenance` — create ticket; Asset Manager/Admin only; sets status=scheduled
+- [ ] **MAINT-API-03**: `PATCH /api/v1/maintenance/{id}/status` — advance status (scheduled→in_progress→completed or →blocked); enforces valid transitions; blocked requires blocked_reason
+
+### Frontend Wiring
+
+- [ ] **FE-WIRE-01**: Frontend `lib/api.ts` module created with `apiFetch` wrapper: base URL from `NEXT_PUBLIC_API_URL`, attaches Bearer token from localStorage, handles 401 (redirect to login)
+- [ ] **FE-WIRE-02**: Auth flow wired: login page calls `POST /api/v1/auth/login`, stores JWT in localStorage, fetches `/auth/me` to populate user context
+- [ ] **FE-WIRE-03**: Asset list + detail pages wired: `GET /api/v1/assets` + `GET /api/v1/assets/{id}` replace mock `assets` array
+- [ ] **FE-WIRE-04**: Assignment pages wired: `GET /api/v1/assignments` replaces mock `assignmentRecords`; approve/reject/return call real endpoints
+- [ ] **FE-WIRE-05**: Maintenance page wired: `GET /api/v1/maintenance` replaces mock `maintenanceRecords`; create ticket and status update call real endpoints
+- [ ] **FE-WIRE-06**: User Management page wired: `GET /api/v1/users`, create, edit-role, deactivate call real endpoints (Admin only)
+- [ ] **FE-WIRE-07**: Global store (`lib/store.tsx`) refactored: in-memory seed arrays removed; all mutations go through API calls; loading/error states added
+
+### Coverage
+
+**v2.0 requirements: 42 total**
+- Project Structure & Environment: 6 (ENV-01–06)
+- Database Models & Migrations: 6 (DB-01–06)
+- Authentication & Authorization: 6 (AUTH-01–06)
+- Asset API: 6 (ASSET-API-01–06)
+- User Management API: 4 (USER-API-01–04)
+- Assignment API: 5 (ASGN-API-01–05)
+- Maintenance API: 3 (MAINT-API-01–03)
+- Frontend Wiring: 7 (FE-WIRE-01–07)
+
+Mapped to phases: 42
+Unmapped: 0 ✓

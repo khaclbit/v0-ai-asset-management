@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Frontend UI Implementation
+milestone: v2.0
+milestone_name: Backend Foundation
 status: planning
-stopped_at: Milestone v1.3 started
-last_updated: "2026-06-28T14:46:38.000Z"
-last_activity: 2026-06-28 -- Milestone v1.3 started, defining requirements and roadmap
+stopped_at: Milestone v2.0 started
+last_updated: "2026-06-30T00:50:00.000Z"
+last_activity: 2026-06-30 -- Milestone v2.0 started, defining requirements and roadmap
 progress:
   total_phases: 0
   completed_phases: 0
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-28)
+See: .planning/PROJECT.md (updated 2026-06-30)
 
-**Core value:** Implement all 10 frontend UI sections with mock/static data, fully aligned to SDD wireframes — shadcn/ui + Tailwind v4 + Recharts.
-**Current focus:** Defining requirements and roadmap for v1.3
+**Core value:** Production-grade FastAPI + PostgreSQL backend with JWT/RBAC auth, core domain APIs, and frontend wired to real data.
+**Current focus:** Defining requirements and roadmap for v2.0
 
 ## Current Position
 
 Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
-Last activity: 2026-06-28 — Milestone v1.3 started
+Last activity: 2026-06-30 — Milestone v2.0 Backend Foundation started
 
 ## Performance Metrics
 
@@ -60,11 +60,15 @@ Last activity: 2026-06-28 — Milestone v1.3 started
 - [v1.2 Phase 17]: `overdue` is a DERIVED state — never stored in DB, computed as `status === 'active' && expected_return_date < today`.
 - [v1.2 Phase 17]: Bell icon navigates full-page to `/dashboard/notifications` — NOT a dropdown.
 - [v1.2 Phase 17]: `/borrow` renamed to `/assignments` in navigation.
-- [v1.2 Phase 18]: `/dashboard/predictive` route gap — sidebar declared `/dashboard/ai` but page is at `predictive/`. Fix needed in Phase 20+.
+- [v1.2 Phase 18]: `/dashboard/predictive` route gap — fixed in Phase 23 (redirect to `/dashboard/ai`).
 - [v1.2 Phase 19]: AI NEVER writes to business tables — only writes to `ai_recommendations`. Enforced at API middleware.
 - [v1.2 Phase 19]: paho-mqtt v2 breaking: `on_connect` requires 5 args with `reason_code` parameter.
 - [v1.2 Phase 19]: Recharts always uses `ChartContainer` wrapper from `components/ui/chart.tsx` — never raw `ResponsiveContainer`.
 - [v1.2 Phase 19]: `AuditEvents` is append-only — no UPDATE or DELETE ever. `AuditService.append()` only.
+- [v1.3 Complete]: All 24 phases shipped. Frontend uses Next.js 15 + shadcn/ui + Tailwind v4 with @base-ui/react/button (no asChild prop).
+- [v2.0 Start]: Backend stack confirmed: FastAPI + PostgreSQL + SQLAlchemy + Alembic + JWT (python-jose) + Docker Compose.
+- [v2.0 Start]: No IoT/AI backend in this milestone. Notification delivery deferred to v2.1.
+- [v2.0 Start]: Frontend wiring (replace mock store) is IN SCOPE for this milestone.
 
 ### Pending Todos
 
@@ -76,7 +80,7 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-06-28T14:46:38.000Z
-Stopped at: Milestone v1.3 started
+Last session: 2026-06-30T00:50:00.000Z
+Stopped at: Milestone v2.0 started
 Resume file: None
-Next action: `/gsd-plan-phase 20`
+Next action: `/gsd-plan-phase 25`
