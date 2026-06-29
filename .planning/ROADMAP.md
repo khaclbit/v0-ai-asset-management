@@ -569,7 +569,7 @@ Plans:
 - [x] **Phase 25: Backend Scaffold & Docker Environment** — FastAPI project structure, Docker Compose stack, environment configuration, Alembic init, pinned deps, and idempotent seed script (ENV-01, ENV-02, ENV-03, ENV-04, ENV-05, ENV-06)
 - [x] **Phase 26: Database Models & Migrations** — SQLAlchemy models for all four core entities, FK relationships, indexes, and Alembic initial migration that applies cleanly to a fresh DB (DB-01, DB-02, DB-03, DB-04, DB-05, DB-06)
 - [x] **Phase 27: Authentication & Authorization** — JWT login + refresh endpoints, /auth/me, bcrypt hashing, reusable `get_current_user` and `require_role` FastAPI dependencies (AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06)
-- [ ] **Phase 28: Asset API** — Full CRUD asset endpoints with pagination/filtering, lifecycle state machine enforced server-side, retire action (ASSET-API-01, ASSET-API-02, ASSET-API-03, ASSET-API-04, ASSET-API-05, ASSET-API-06)
+- [x] **Phase 28: Asset API** — Full CRUD asset endpoints with pagination/filtering, lifecycle state machine enforced server-side, retire action (ASSET-API-01, ASSET-API-02, ASSET-API-03, ASSET-API-04, ASSET-API-05, ASSET-API-06)
 - [ ] **Phase 29: User, Assignment & Maintenance APIs** — User management endpoints, assignment workflow (create/approve/reject/return), maintenance record CRUD (USER-API-01, USER-API-02, USER-API-03, USER-API-04, ASGN-API-01, ASGN-API-02, ASGN-API-03, ASGN-API-04, ASGN-API-05, MAINT-API-01, MAINT-API-02, MAINT-API-03)
 - [ ] **Phase 30: Frontend Wiring** — Replace all mock data with real API calls; auth flow, asset/assignment/maintenance/user pages wired; global store cleaned of seed arrays; loading and error states added (FE-WIRE-01, FE-WIRE-02, FE-WIRE-03, FE-WIRE-04, FE-WIRE-05, FE-WIRE-06, FE-WIRE-07)
 
@@ -687,12 +687,12 @@ Plans:
 | AUTH-04 | get_current_user dependency | Phase 27 | ✅ Complete |
 | AUTH-05 | require_role dependency | Phase 27 | ✅ Complete |
 | AUTH-06 | bcrypt password hashing | Phase 27 | ✅ Complete |
-| ASSET-API-01 | GET /api/v1/assets (paginated, filterable) | Phase 28 | Pending |
-| ASSET-API-02 | POST /api/v1/assets | Phase 28 | Pending |
-| ASSET-API-03 | GET /api/v1/assets/{id} | Phase 28 | Pending |
-| ASSET-API-04 | PATCH /api/v1/assets/{id} | Phase 28 | Pending |
-| ASSET-API-05 | POST /api/v1/assets/{id}/retire | Phase 28 | Pending |
-| ASSET-API-06 | Lifecycle state machine enforced server-side | Phase 28 | Pending |
+| ASSET-API-01 | GET /api/v1/assets (paginated, filterable) | Phase 28 | ✅ Complete |
+| ASSET-API-02 | POST /api/v1/assets | Phase 28 | ✅ Complete |
+| ASSET-API-03 | GET /api/v1/assets/{id} | Phase 28 | ✅ Complete |
+| ASSET-API-04 | PATCH /api/v1/assets/{id} | Phase 28 | ✅ Complete |
+| ASSET-API-05 | POST /api/v1/assets/{id}/retire | Phase 28 | ✅ Complete |
+| ASSET-API-06 | Lifecycle state machine enforced server-side | Phase 28 | ✅ Complete |
 | USER-API-01 | GET /api/v1/users | Phase 29 | Pending |
 | USER-API-02 | POST /api/v1/users | Phase 29 | Pending |
 | USER-API-03 | PATCH /api/v1/users/{id}/role | Phase 29 | Pending |
