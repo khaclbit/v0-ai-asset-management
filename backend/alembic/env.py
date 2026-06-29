@@ -12,11 +12,10 @@ from app.config import settings
 from app.models.base import Base
 
 # Import all models here so Alembic can detect them for autogenerate.
-# Phase 26 will add the domain models; they'll be auto-discovered once imported.
-# from app.models.user import User
-# from app.models.asset import Asset
-# from app.models.assignment import Assignment
-# from app.models.maintenance import MaintenanceRecord
+from app.models.user import User  # noqa: F401
+from app.models.asset import Asset  # noqa: F401
+from app.models.assignment import Assignment  # noqa: F401
+from app.models.maintenance import MaintenanceRecord  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
