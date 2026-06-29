@@ -566,7 +566,7 @@ Plans:
 
 ### Phase Sequence
 
-- [ ] **Phase 25: Backend Scaffold & Docker Environment** — FastAPI project structure, Docker Compose stack, environment configuration, Alembic init, pinned deps, and idempotent seed script (ENV-01, ENV-02, ENV-03, ENV-04, ENV-05, ENV-06)
+- [x] **Phase 25: Backend Scaffold & Docker Environment** — FastAPI project structure, Docker Compose stack, environment configuration, Alembic init, pinned deps, and idempotent seed script (ENV-01, ENV-02, ENV-03, ENV-04, ENV-05, ENV-06)
 - [ ] **Phase 26: Database Models & Migrations** — SQLAlchemy models for all four core entities, FK relationships, indexes, and Alembic initial migration that applies cleanly to a fresh DB (DB-01, DB-02, DB-03, DB-04, DB-05, DB-06)
 - [ ] **Phase 27: Authentication & Authorization** — JWT login + refresh endpoints, /auth/me, bcrypt hashing, reusable `get_current_user` and `require_role` FastAPI dependencies (AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06)
 - [ ] **Phase 28: Asset API** — Full CRUD asset endpoints with pagination/filtering, lifecycle state machine enforced server-side, retire action (ASSET-API-01, ASSET-API-02, ASSET-API-03, ASSET-API-04, ASSET-API-05, ASSET-API-06)
@@ -669,12 +669,12 @@ Plans:
 
 | Requirement | Description | Phase | Status |
 |-------------|-------------|-------|--------|
-| ENV-01 | Backend project scaffolded under `backend/` | Phase 25 | Pending |
-| ENV-02 | docker-compose.yml at project root | Phase 25 | Pending |
-| ENV-03 | backend/.env.example documented | Phase 25 | Pending |
-| ENV-04 | Alembic initialized under backend/alembic/ | Phase 25 | Pending |
-| ENV-05 | requirements.txt with pinned deps | Phase 25 | Pending |
-| ENV-06 | backend/seed.py creates first Admin user, idempotent | Phase 25 | Pending |
+| ENV-01 | Backend project scaffolded under `backend/` | Phase 25 | ✅ Complete |
+| ENV-02 | docker-compose.yml at project root | Phase 25 | ✅ Complete |
+| ENV-03 | backend/.env.example documented | Phase 25 | ✅ Complete |
+| ENV-04 | Alembic initialized under backend/alembic/ | Phase 25 | ✅ Complete |
+| ENV-05 | requirements.txt with pinned deps | Phase 25 | ✅ Complete |
+| ENV-06 | backend/seed.py creates first Admin user, idempotent | Phase 25 | ✅ Complete |
 | DB-01 | SQLAlchemy User model | Phase 26 | Pending |
 | DB-02 | SQLAlchemy Asset model | Phase 26 | Pending |
 | DB-03 | SQLAlchemy Assignment model | Phase 26 | Pending |
