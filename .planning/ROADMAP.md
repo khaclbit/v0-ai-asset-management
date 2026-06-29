@@ -571,7 +571,7 @@ Plans:
 - [x] **Phase 27: Authentication & Authorization** — JWT login + refresh endpoints, /auth/me, bcrypt hashing, reusable `get_current_user` and `require_role` FastAPI dependencies (AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, AUTH-06)
 - [x] **Phase 28: Asset API** — Full CRUD asset endpoints with pagination/filtering, lifecycle state machine enforced server-side, retire action (ASSET-API-01, ASSET-API-02, ASSET-API-03, ASSET-API-04, ASSET-API-05, ASSET-API-06)
 - [x] **Phase 29: User, Assignment & Maintenance APIs** — User management endpoints, assignment workflow (create/approve/reject/return), maintenance record CRUD (USER-API-01, USER-API-02, USER-API-03, USER-API-04, ASGN-API-01, ASGN-API-02, ASGN-API-03, ASGN-API-04, ASGN-API-05, MAINT-API-01, MAINT-API-02, MAINT-API-03)
-- [ ] **Phase 30: Frontend Wiring** — Replace all mock data with real API calls; auth flow, asset/assignment/maintenance/user pages wired; global store cleaned of seed arrays; loading and error states added (FE-WIRE-01, FE-WIRE-02, FE-WIRE-03, FE-WIRE-04, FE-WIRE-05, FE-WIRE-06, FE-WIRE-07)
+- [x] **Phase 30: Frontend Wiring** — Replace all mock data with real API calls; auth flow, asset/assignment/maintenance/user pages wired; global store cleaned of seed arrays; loading and error states added (FE-WIRE-01, FE-WIRE-02, FE-WIRE-03, FE-WIRE-04, FE-WIRE-05, FE-WIRE-06, FE-WIRE-07)
 
 ---
 

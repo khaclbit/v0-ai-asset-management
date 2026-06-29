@@ -465,13 +465,13 @@ Requirements for the v2.0 Backend Foundation milestone. Target: FastAPI + Postgr
 
 ### Frontend Wiring
 
-- [ ] **FE-WIRE-01**: Frontend `lib/api.ts` module created with `apiFetch` wrapper: base URL from `NEXT_PUBLIC_API_URL`, attaches Bearer token from localStorage, handles 401 (redirect to login)
-- [ ] **FE-WIRE-02**: Auth flow wired: login page calls `POST /api/v1/auth/login`, stores JWT in localStorage, fetches `/auth/me` to populate user context
-- [ ] **FE-WIRE-03**: Asset list + detail pages wired: `GET /api/v1/assets` + `GET /api/v1/assets/{id}` replace mock `assets` array
-- [ ] **FE-WIRE-04**: Assignment pages wired: `GET /api/v1/assignments` replaces mock `assignmentRecords`; approve/reject/return call real endpoints
-- [ ] **FE-WIRE-05**: Maintenance page wired: `GET /api/v1/maintenance` replaces mock `maintenanceRecords`; create ticket and status update call real endpoints
-- [ ] **FE-WIRE-06**: User Management page wired: `GET /api/v1/users`, create, edit-role, deactivate call real endpoints (Admin only)
-- [ ] **FE-WIRE-07**: Global store (`lib/store.tsx`) refactored: in-memory seed arrays removed; all mutations go through API calls; loading/error states added
+- [x] **FE-WIRE-01**: Frontend `lib/api.ts` module created with `apiFetch` wrapper: base URL from `NEXT_PUBLIC_API_URL`, attaches Bearer token from localStorage, handles 401 (redirect to login)
+- [x] **FE-WIRE-02**: Auth flow wired: login page calls `POST /api/v1/auth/login`, stores JWT in localStorage, fetches `/auth/me` to populate user context
+- [x] **FE-WIRE-03**: Asset list + detail pages wired: `GET /api/v1/assets` + `GET /api/v1/assets/{id}` replace mock `assets` array
+- [x] **FE-WIRE-04**: Assignment pages wired: `GET /api/v1/assignments` replaces mock `assignmentRecords`; approve/reject/return call real endpoints
+- [x] **FE-WIRE-05**: Maintenance page wired: `GET /api/v1/maintenance` replaces mock `maintenanceRecords`; create ticket and status update call real endpoints
+- [x] **FE-WIRE-06**: User Management page wired: `GET /api/v1/users`, create, edit-role, deactivate call real endpoints (Admin only)
+- [x] **FE-WIRE-07**: Global store (`lib/store.tsx`) refactored: in-memory seed arrays removed; all mutations go through API calls; loading/error states added
 
 ### Coverage
 

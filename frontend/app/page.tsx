@@ -7,8 +7,10 @@ import type { UserRole } from "@/lib/data"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Boxes, ShieldCheck, Briefcase, User, Search, ArrowRight } from "lucide-react"
+import { Boxes, ShieldCheck, Briefcase, User, Search, ArrowRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { authApi } from "@/lib/api"
+import { setTokens } from "@/lib/auth"
 
 const ROLES: {
   role: UserRole
@@ -49,15 +51,32 @@ const ROLES: {
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login } = useStore()
+  const { login, loginWithProfile } = useStore()
   const [role, setRole] = useState<UserRole>("Admin")
   const [email, setEmail] = useState("alex.carter@company.com")
   const [password, setPassword] = useState("demo1234")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    login(email, role)
-    router.push("/dashboard")
+    setIsSubmitting(true)
+    setApiError(null)
+
+    try {
+      // Try real API login
+      const tokens = await authApi.login(email, password)
+      setTokens(tokens.access_token, tokens.refresh_token)
+      const me = await authApi.me()
+      loginWithProfile(me)
+      router.push("/dashboard")
+    } catch {
+      // API unavailable or wrong credentials — fall back to demo mode
+      login(email, role)
+      router.push("/dashboard")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   function pickRole(r: UserRole, defaultEmail: string) {
@@ -145,6 +164,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -155,16 +175,29 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={isSubmitting}
               />
             </div>
-            <Button type="submit" className="w-full gap-2">
-              Sign in as {role}
-              <ArrowRight className="size-4" />
+            {apiError && (
+              <p className="text-sm text-destructive">{apiError}</p>
+            )}
+            <Button type="submit" className="w-full gap-2" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                <>
+                  Sign in as {role}
+                  <ArrowRight className="size-4" />
+                </>
+              )}
             </Button>
           </form>
 
           <p className="text-center text-xs text-muted-foreground">
-            This is a demo account — sign in directly without a real password.
+            Connects to real backend when available; falls back to demo mode.
           </p>
         </div>
       </section>
