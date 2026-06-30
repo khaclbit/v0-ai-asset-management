@@ -26,6 +26,10 @@ from app.models.user import User
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+def _truncate(plain: str) -> str:
+    return plain.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+
+
 def seed_admin(db: Session) -> None:
     """Create the first Admin user if not already present."""
     existing = db.query(User).filter(User.email == settings.FIRST_ADMIN_EMAIL).first()
@@ -35,7 +39,7 @@ def seed_admin(db: Session) -> None:
 
     admin = User(
         email=settings.FIRST_ADMIN_EMAIL,
-        hashed_password=pwd_context.hash(settings.FIRST_ADMIN_PASSWORD),
+        hashed_password=pwd_context.hash(_truncate(settings.FIRST_ADMIN_PASSWORD)),
         full_name="System Administrator",
         role="Admin",
         department="IT",
