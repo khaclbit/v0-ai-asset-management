@@ -11,11 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.user import User
 
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__truncate_error=False,  # silently truncate at 72 bytes instead of raising
-)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ─── Password ────────────────────────────────────────────────────────────────
