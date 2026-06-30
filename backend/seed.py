@@ -18,16 +18,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
 
 from app.config import settings
 from app.models.user import User
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def _truncate(plain: str) -> str:
-    return plain.encode("utf-8")[:72].decode("utf-8", errors="ignore")
+from app.services.auth import hash_password
 
 
 def seed_admin(db: Session) -> None:
@@ -39,7 +33,7 @@ def seed_admin(db: Session) -> None:
 
     admin = User(
         email=settings.FIRST_ADMIN_EMAIL,
-        hashed_password=pwd_context.hash(_truncate(settings.FIRST_ADMIN_PASSWORD)),
+        hashed_password=hash_password(settings.FIRST_ADMIN_PASSWORD),
         full_name="System Administrator",
         role="Admin",
         department="IT",

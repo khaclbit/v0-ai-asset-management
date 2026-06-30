@@ -11,22 +11,21 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.user import User
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__truncate_error=False,  # silently truncate at 72 bytes instead of raising
+)
 
 
 # ─── Password ────────────────────────────────────────────────────────────────
 
-def _truncate(plain: str) -> str:
-    """bcrypt silently truncates or raises on passwords > 72 bytes; enforce it explicitly."""
-    return plain.encode("utf-8")[:72].decode("utf-8", errors="ignore")
-
-
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(_truncate(plain))
+    return pwd_context.hash(plain)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(_truncate(plain), hashed)
+    return pwd_context.verify(plain, hashed)
 
 
 # ─── JWT ─────────────────────────────────────────────────────────────────────
