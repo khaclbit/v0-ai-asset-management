@@ -42,132 +42,169 @@
 ## Phase Details
 
 ### Phase 5: Foundation, Layout & Dashboard
+
 **Goal:** Users can log in as any of the four roles, navigate a role-aware sidebar with v1.0 module labels, and view a dashboard with live-looking KPI cards, charts, and alert panels.
 **Depends on:** Nothing (first phase of v1.1)
 **Requirements:** FNDN-01, FNDN-02, FNDN-03, FNDN-04, FNDN-05, FNDN-06, DASH-01, DASH-02, DASH-03, DASH-04, DASH-05
 **Success Criteria** (what must be TRUE):
+
   1. Login page renders entirely in English with a 4-role picker (Admin, Asset Manager, Staff, Auditor); selecting a role and clicking Login navigates to the dashboard
   2. Sidebar displays all v1.0 module labels (Assets, Assignments, Maintenance, AI Assistant, OCR Intake, Predictive, Reports, Audit Log) and hides role-restricted items — Staff has no Audit Log, Auditor sees no create/edit actions
   3. Dashboard shows four KPI cards (Total Assets, Active Assignments, Assets in Maintenance, Warranty Expiring Soon) with mock numeric values
   4. Dashboard shows an asset-by-category bar chart with English labels and a "Warranty Expiring Soon" alert panel (≤ 3 months)
   5. Dashboard shows a "High Failure Risk" AI alert panel with risk scores and a "Recent Assignments" list with status badges; Logout returns the user to the login page
+
 **Plans:** 3/3 plans complete
 Plans:
+
 - [x] 05-01-PLAN.md — Foundation dashboard shell, role-aware navigation, and overview baseline
 - [x] 05-02-PLAN.md — DASH-01 KPI contract closure with warranty-soon KPI and regression tests
 - [x] 05-03-PLAN.md — Phase 5 tracker and verification/validation synchronization
+
 **UI hint**: yes
 
 ### Phase 6: Asset Registry UI
+
 **Goal:** Users can browse the full asset list with lifecycle state badges, and Admin/Asset Manager can create, edit, and retire assets via forms and confirmation dialogs.
 **Depends on:** Phase 5
 **Requirements:** ASSET-01, ASSET-02, ASSET-03, ASSET-04, ASSET-05, ASSET-06
 **Success Criteria** (what must be TRUE):
+
   1. Asset list page shows a paginated table with lifecycle state badges: registered, available, assigned, maintenance, retired
   2. Admin/Asset Manager sees a "Create Asset" button that opens a form; submitting the form mock-saves and adds the asset to the list
   3. Admin/Asset Manager can click an asset row to open an edit form pre-filled with existing data; saving mock-updates the record
   4. Admin can trigger a "Mark as Retired" action on any asset; a confirmation dialog appears before the state change is applied
   5. Filter controls allow narrowing the list by category and lifecycle state; a search field filters by asset name or serial number
+
 **Plans:** 2/2 plans complete
 **UI hint**: yes
 
 ### Phase 7: Assignment & Return Workflow UI
+
 **Goal:** Users can create and track assignment requests through their full lifecycle — from request through approval, active use, return initiation, and closure — with clear status badges and overdue highlighting.
 **Depends on:** Phase 6
 **Requirements:** ASGN-01, ASGN-02, ASGN-03, ASGN-04, ASGN-05, ASGN-06
 **Success Criteria** (what must be TRUE):
+
   1. Staff/Asset Manager can open a "New Assignment Request" form with fields for asset, assignee, and expected return date; submitting creates a record with status "requested"
   2. Asset Manager sees a pending requests queue and can approve (→ active) or reject (→ rejected) each request
   3. Assignment list displays all five status badges — requested, active, overdue, closed, rejected — correctly applied to matching records
   4. Asset Manager or Staff can initiate a return from an active assignment; Asset Manager can then validate and close the return (status → closed)
   5. Overdue assignments are visually distinguished in the list (e.g., red row highlight or overdue badge) without any manual action required
+
 **Plans:** TBD
 **UI hint**: yes
 
 ### Phase 8: Maintenance & Warranty UI
+
 **Goal:** Users can view scheduled maintenance records with state badges, Asset Manager can update maintenance state, and all users see warranty expiry warnings for at-risk assets.
 **Depends on:** Phase 7
 **Requirements:** MAINT-01, MAINT-02, MAINT-03, MAINT-04
 **Success Criteria** (what must be TRUE):
+
   1. Maintenance schedule page shows a list of maintenance records with state badges: scheduled, in_progress, completed, blocked
   2. Asset Manager can open a maintenance record and change its state via a dropdown or button group; the badge updates immediately (mock)
   3. Warranty tracker page shows a list of assets with warranty state badges: active, expiring_soon, expired, void
   4. Assets with warranty expiring within 30 days surface a notification-style warning (banner, badge, or alert row) visible without navigating away from the tracker
+
 **Plans:** 2/2 plans complete
 Plans:
+
 - [x] 08-01-PLAN.md — Maintenance grouped schedule + guarded inline state updates
 - [x] 08-02-PLAN.md — Warranty tracker filters + <=30 day warning summary/jump behavior
+
 **UI hint**: yes
 
 ### Phase 9: AI Governance UIs
+
 **Goal:** Users can interact with the AI assistant panel, run OCR invoice intake with confidence-routed review forms, and browse predictive maintenance risk cards with approval and escalation flows.
 **Depends on:** Phase 8
 **Requirements:** AIST-01, AIST-02, AIST-03, AIST-04, OCR-01, OCR-02, OCR-03, OCR-04, OCR-05, OCR-06, PRED-01, PRED-02, PRED-03, PRED-04, PRED-05
 **Success Criteria** (what must be TRUE):
+
   1. AI Assistant panel accepts a typed natural-language question; the response shows answer, source, filters, confidence score, and correlation_id fields; a low-confidence query returns an "insufficient data" variant with clarifying questions; a read-only trace panel shows provenance metadata for every response
   2. OCR Intake panel accepts a mock file upload and displays extracted fields with a confidence score and band (High / Medium / Low)
   3. Confidence routing displays the correct review form: High → quick-confirm pre-filled form, Medium → field-by-field review form, Low → rejection message with rescan prompt; Submit button is disabled until all mandatory fields (Name, Category, Serial, Purchase Date, Vendor, Price) are confirmed
   4. Predictive Maintenance page lists AI-generated recommendations with risk band badges (High, Medium, Low); each card shows risk band, confidence score, top contributing factors, and correlation_id
   5. Asset Manager can approve or defer a High-risk recommendation (mock action); High-risk items show an SLA countdown and items past deadline show an escalation notice
+
 **Plans:** 3/3 plans complete
 Plans:
+
 - [x] 09-01-PLAN.md — Assistant governance response contract + collapsed trace panel
 - [x] 09-02-PLAN.md — OCR confidence routing + hierarchy/provenance alignment
 - [x] 09-03-PLAN.md — Predictive recommendations + role-gated escalation actions
+
 **UI hint**: yes
 
 ### Phase 10: Reporting & Audit Log UI
+
 **Goal:** Users can view role-appropriate summary reports and Admin/Auditor users can read a fully filterable, expandable, immutable audit event log.
 **Depends on:** Phase 9
 **Requirements:** RPT-01, RPT-02, RPT-03, RPT-04, AUDT-01, AUDT-02, AUDT-03
 **Success Criteria** (what must be TRUE):
+
   1. Reports page shows an asset overview report (count by category, count by lifecycle state), an assignment report (active and historical), and a maintenance schedule report (upcoming and overdue)
   2. A Staff user viewing reports sees only their own assignments — not the full organizational data visible to Admin/Asset Manager
   3. Audit Log page (Admin/Auditor only) shows a table of immutable events with columns: actor, action, entity, before/after state, timestamp, and correlation_id
   4. Audit log supports category filtering (Business, Security, AI-assisted) and clicking a row expands full event details including any AI recommendation linkage
+
 **Plans:** 3/3 plans complete
 Plans:
+
 - [x] 10-01-PLAN.md — Reporting selectors + full reports UI coverage and staff scoping
 - [x] 10-02-PLAN.md — Immutable audit event contract + read-only dataset selectors
 - [x] 10-03-PLAN.md — Audit table UI with category filter and expandable details
+
 **UI hint**: yes
 
 ### Phase 11: Navigation & Access Control Gap Closure
+
 **Goal:** Restore valid dashboard navigation targets and enforce route-level role access controls so restricted modules cannot be accessed through direct URL bypass.
 **Depends on:** Phase 10
 **Requirements:** FNDN-03, FNDN-04, FNDN-06
 **Gap Closure:** Closes milestone audit integration/flow gaps for broken audit navigation and route-level RBAC bypass.
 **Success Criteria** (what must be TRUE):
+
   1. Sidebar links only point to existing dashboard routes (no 404 for audit navigation)
   2. Route-level guards deny unauthorized roles from accessing restricted pages via direct URL
   3. Login/logout and role-appropriate navigation behavior remain intact after access-control changes
+
 **Plans:** 2/2 plans complete
 **UI hint**: yes
 
 ### Phase 12: Assignment Approval Integrity Gap Closure
+
 **Goal:** Ensure assignment approval logic updates assignment and related asset state atomically and only when approval actually succeeds.
 **Depends on:** Phase 11
 **Requirements:** ASGN-02
 **Gap Closure:** Closes milestone audit integration/flow gap for assignment approval conflict desynchronization.
 **Success Criteria** (what must be TRUE):
+
   1. Conflicting approval paths do not mutate asset assignment side effects when assignment state remains unapproved
   2. Successful approvals still transition assignment to active and sync asset status/assignee correctly
+
 **Plans:** 1/1 plans complete
 **UI hint**: no
 
 ### Phase 13: Verification & Validation Artifact Backfill
+
 **Goal:** Backfill milestone gating artifacts so all completed v1.1 phases have required verification and Nyquist validation coverage records.
 **Depends on:** Phase 12
 **Requirements:** N/A (artifact backfill phase)
 **Gap Closure:** Closes milestone audit gaps for missing phase-level verification/validation artifacts.
 **Success Criteria** (what must be TRUE):
+
   1. Phase 5 and Phase 9 each have a current VERIFICATION.md with explicit requirement coverage and evidence
   2. Missing VALIDATION.md artifacts for audited phases are created or updated with Nyquist status and per-task mapping
   3. Milestone re-audit no longer reports missing verification/validation artifacts for Phases 5, 8, and 9
+
 **Plans:** 2/2 plans complete
 Plans:
+
 - [x] 13-01-PLAN.md — Backfill 05/09 VERIFICATION and 05/08 VALIDATION artifacts
 - [x] 13-02-PLAN.md — Re-audit milestone artifact gaps and record Phase 13 verification evidence
+
 **UI hint**: no
 
 ## Progress
@@ -263,77 +300,95 @@ Plans:
 ## Phase Details
 
 ### Phase 14: System Architecture & Domain Model
+
 **Goal:** A complete architectural blueprint is produced documenting all system boundaries, service pipelines, Docker topology, and domain state machines with a conceptual entity overview.
 **Depends on:** Nothing (first phase of v1.2)
 **Requirements:** ARCH-01, ARCH-02, ARCH-03, ARCH-04, ARCH-05, ARCH-06, ARCH-07, DOMAIN-01, DOMAIN-02, DOMAIN-03, DOMAIN-04, DOMAIN-05, DOMAIN-06
 **Success Criteria** (what must be TRUE):
+
   1. System Context Diagram shows all 5 external actors (Administrator, Manager, Staff, Python Sensor Simulator, MQTT Broker) and the full system boundary
   2. Module Decomposition diagram covers every module with owned responsibilities and explicit integration boundary contracts
   3. IoT data pipeline design traces the full path: Python Sensor Simulator → MQTT (Mosquitto, QoS 1) → FastAPI MQTT consumer → PostgreSQL `sensor_readings` → WebSocket → React dashboard; topic schema (`assets/{asset_id}/sensors/{sensor_type}`) and JSON payload contract are specified
   4. AI pipeline design defines the complete flow: `sensor_readings` → Feature Engineering → Scikit-learn model → `ai_recommendations` → Manager approval gate → `maintenance_records`; the boundary rule (AI never writes to business tables) is explicitly diagrammed
   5. All domain state machines are diagrammed (asset lifecycle, maintenance lifecycle, AI recommendation) with valid transitions, guards, and business rules; notification and Docker topology diagrams are produced; conceptual ER diagram shows all 9 entities (Assets, Categories, Assignments, MaintenanceRecords, SensorReadings, AIRecommendations, Notifications, AuditEvents, Users) with primary keys, foreign keys, and cardinality
+
 **Plans:** TBD
 
 ### Phase 15: Information Architecture, User Flows & Navigation
+
 **Goal:** A complete navigation map, sitemap, and user flow diagrams for all 5 core journeys are produced, grounded in the actor and role model from Phase 14.
 **Depends on:** Phase 14
 **Requirements:** IA-01, IA-02, IA-03
 **Success Criteria** (what must be TRUE):
+
   1. Navigation map shows all modules with page hierarchy and explicit role-based visibility rules for Administrator, Manager, and Staff (identifying what each role can and cannot see)
   2. Sitemap covers all pages, parent routes, and per-role access control annotations
   3. All 5 user flow diagrams are produced: (1) asset lifecycle transitions, (2) assignment request→approval→return, (3) maintenance ticket creation via AI recommendation, (4) AI recommendation approval by Manager, (5) IoT sensor alert response workflow
   4. Each user flow is traceable to the actors, roles, and state machines defined in Phase 14
+
 **Plans:** TBD
 **UI hint**: yes
 
 ### Phase 16: Design System & Component Catalog
+
 **Goal:** A complete Material Design 3–based design system is documented with color palette, typography, spacing system, component catalog, and Recharts chart standards.
 **Depends on:** Phase 15
 **Requirements:** DS-01, DS-02, DS-03, DS-04, DS-05
 **Success Criteria** (what must be TRUE):
+
   1. Color palette defines primary, secondary, semantic tokens (success/warning/error/info), and neutral surface tokens — each with hex values and explicit usage rules
   2. Typography spec defines font family, full type scale (Display, Headline, Title, Body, Label, Caption), line-height and letter-spacing rules per level
   3. Spacing system defines base unit (4px or 8px), layout grid, responsive breakpoints, card padding, and section margin rules
   4. Component catalog documents all variants: Button (primary/secondary/ghost/danger), Input/Select, Card (metric + content), Table, Status Chip (all lifecycle states + risk bands), Badge, Alert/Banner, Modal/Dialog, and Skeleton loader — with visual states (default, hover, disabled, error)
   5. Chart standards define color series palette, axis label formatting, threshold reference line styling, legend placement rules, and empty-state design for Recharts components
+
 **Plans:** TBD
 **UI hint**: yes
 
 ### Phase 17: Core UI Wireframes
+
 **Goal:** Wireframes for the Dashboard, Asset Management, Assignment Workflow, Maintenance Management, and sidebar navigation are produced — covering the primary daily-use surfaces of the system.
 **Depends on:** Phase 16
 **Requirements:** UX-01, UX-02, UX-03, UX-04, UX-10
 **Success Criteria** (what must be TRUE):
+
   1. Dashboard wireframe shows KPI cards (Total Assets, Active Assignments, Assets in Maintenance, High Risk Assets count), asset distribution chart, AI risk distribution chart, real-time sensor summary panel, and recent alerts list — all annotated with data sources
   2. Asset Management wireframes cover: asset list (with lifecycle state badge and sensor status dot), asset detail page (with associated sensor readings panel), and create/edit asset form
   3. Assignment Workflow wireframes cover: assignment request form, pending requests queue (Manager view), assignment list with all 5 status badges (Requested/Active/Overdue/Closed/Rejected), return initiation flow, and close flow
   4. Maintenance Management wireframes cover: maintenance schedule list with state badges, state update UI (Asset Manager), and warranty tracker with expiry warning indicators
   5. Sidebar navigation wireframe shows role-aware module list with active, hover, collapsed, and expanded states
+
 **Plans:** TBD
 **UI hint**: yes
 
 ### Phase 18: IoT & AI UI Wireframes
+
 **Goal:** Wireframes for IoT Monitoring, AI Predictive Maintenance, Notification Center, Audit Log, and User Management pages are produced — covering the IoT, AI governance, and administrative surfaces.
 **Depends on:** Phase 17
 **Requirements:** UX-05, UX-06, UX-07, UX-08, UX-09
 **Success Criteria** (what must be TRUE):
+
   1. IoT Monitoring wireframe shows: asset selector sidebar with live status dots, per-asset sensor tile grid (one tile per active sensor type showing current value + unit + threshold color), time-series line charts with time window selector (1h/6h/24h/7d), threshold violation indicators, and connection status indicator
   2. AI Predictive Maintenance wireframe shows: recommendation cards with risk band chips (High/Medium/Low), health score and failure risk display, top 3 contributing factors, Manager-only approval gate (Approve | Defer with reason), SLA countdown for High-risk items, and escalation notice for overdue approvals
   3. Notification Center wireframes cover: header bell icon with unread badge, dropdown panel showing latest 5 notifications with deep-link, and full `/notifications` page with pagination and mark-as-read / mark-all-read actions
   4. Audit Log wireframe shows: immutable event table (columns: actor / action / entity / before-after state / timestamp / correlation_id), category filter (Business / Security / AI-assisted), and expandable row for full event details
   5. User Management wireframes (Administrator only) show: user list with role badge, create/edit user form with role assignment, and deactivate (soft-delete) action with no hard-delete option
+
 **Plans:** TBD
 **UI hint**: yes
 
 ### Phase 19: Data Design, API Overview & Folder Architecture
+
 **Goal:** Conceptual ER diagram, API module overview, and project folder structures for the React frontend and FastAPI backend are documented — completing the SDD artifact set.
 **Depends on:** Phase 18
 **Requirements:** DATA-01, DATA-02, FOLD-01, FOLD-02
 **Success Criteria** (what must be TRUE):
+
   1. ER diagram documents all entities, relationships, cardinality notation, and field-level design notes for non-obvious choices — with no SQL DDL or CREATE TABLE statements
   2. API module overview names all 9 modules (Auth, Assets, Assignments, Maintenance, IoT Telemetry, AI Predictions, Notifications, Audit, Users) each with a one-line responsibility statement and no endpoint paths or HTTP verbs
   3. React folder structure under `src/` defines all 8 required directories (components/, pages/, hooks/, services/, store/, types/, utils/, theme/) each with a description of what belongs there
   4. FastAPI folder structure under `app/` defines all 8 required modules (routers/, models/, schemas/, services/, core/, db/, mqtt/, ai/) each with a module responsibility description
+
 **Plans:** TBD
 
 ## Progress
@@ -416,6 +471,7 @@ Plans:
 **Depends on:** Nothing (first phase of v1.3)
 
 **Success criteria:**
+
 1. Dashboard shows all 6 widget sections: stat cards, Asset Health chart, AI Risk Distribution card, Recent Alerts, Maintenance Schedule, Equipment Status
 2. All charts use `ChartContainer` pattern — no raw `ResponsiveContainer` anywhere in the codebase
 3. All status badges use `status-badge.tsx` — no inline colored spans
@@ -432,6 +488,7 @@ Plans:
 **Depends on:** Phase 20
 
 **Success criteria:**
+
 1. Asset list shows all columns from WIREFRAMES.md §3.1; detail drawer shows sensor_device_id and lifecycle state machine display
 2. Assignment list shows all 5 states with correct badges; overdue rows are visually distinguished using client-side derived logic
 3. Assignment request form, approval flow, and return initiation all work end-to-end with mock data
@@ -448,6 +505,7 @@ Plans:
 **Depends on:** Phase 20
 
 **Success criteria:**
+
 1. Device grid shows one card per monitored asset with Online/Offline/Warning status badge
 2. Each card shows 3–6 sensor reading value chips with correct sensor types per category (Laptop: no vibration; Printer: all 6)
 3. Selecting a device shows per-sensor line charts with realistic mock time-series data
@@ -464,6 +522,7 @@ Plans:
 **Depends on:** Phase 20
 
 **Success criteria:**
+
 1. `/dashboard/ai/page.tsx` exists and renders — old `/dashboard/predictive` route redirects to `/dashboard/ai`
 2. Health score leaderboard shows assets sorted by failure risk with health %, risk %, confidence %
 3. Recommendation cards show all fields: health gauge, risk badge, confidence, top factors list
@@ -481,6 +540,7 @@ Plans:
 **Depends on:** Phase 20
 
 **Success criteria:**
+
 1. Notifications inbox shows all 4 notification types; unread items are visually distinct; mark-as-read and mark-all-as-read work
 2. Notification type filter works client-side; notification bell in top nav shows unread count badge
 3. Audit log table is display-only with all columns; clicking a row expands before/after JSON panel
@@ -553,7 +613,6 @@ Plans:
 ---
 *v1.3 roadmap appended: 2026-06-28 for milestone v1.3 Frontend UI Implementation*
 
-
 ---
 
 <details>
@@ -583,7 +642,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 
 ## Phases
 
-- [ ] **Phase 31: Sensor Readings Data Model & Migration** — SQLAlchemy `SensorReading` model and Alembic migration `0002_sensor_readings.py` with composite index; no FK to assets (string-match at query time)
+- [x] **Phase 31: Sensor Readings Data Model & Migration** — SQLAlchemy `SensorReading` model and Alembic migration `0002_sensor_readings.py` with composite index; no FK to assets (string-match at query time) (completed 2026-07-05)
 - [ ] **Phase 32: Mosquitto Broker & Docker Compose Integration** — Add `eclipse-mosquitto:2.0.22` Docker Compose service with explicit `listener 1883 / allow_anonymous true` config; wire `MQTT_HOST`/`MQTT_PORT` into api service and config.py
 - [ ] **Phase 33: WebSocket ConnectionManager + MQTT Consumer + IoT Router** — `ConnectionManager` (set + asyncio.Lock), aiomqtt consumer launched via lifespan `asyncio.create_task`, WebSocket endpoint `/api/v1/iot/ws/{device_id}`, REST backfill endpoint `/api/v1/iot/readings/{device_id}`
 - [ ] **Phase 34: Sensor Simulator** — `scripts/sensor_simulator.py` publishing all 6 `SENSOR_CONFIG` metrics every 5 s over aiomqtt; `seed.py` updated with `sensor_device_id` values; end-to-end pipeline smoke-tested
@@ -598,14 +657,16 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 **Requirements:** IOT-DB-01, IOT-DB-02, IOT-DB-03
 
 **Success Criteria** (what must be TRUE):
+
   1. `docker compose exec api alembic upgrade head` completes without error and `\d sensor_readings` shows all seven columns (`id` UUID PK, `device_id`, `asset_id` nullable, `metric`, `value` float, `unit`, `recorded_at` timestamptz)
   2. `EXPLAIN` on `SELECT … WHERE device_id = ? AND metric = ? AND recorded_at > ?` uses the composite index `(device_id, metric, recorded_at DESC)` — no sequential scan
   3. A manual INSERT into `sensor_readings` with a `device_id` that has no matching row in `assets` succeeds without FK violation — confirming the intentional no-FK design
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
-- [ ] 31-01-PLAN.md — Create SensorReading model, migration 0002, register in env.py, verify all three IOT-DB requirements
+
+- [x] 31-01-PLAN.md — Create SensorReading model, migration 0002, register in env.py, verify all three IOT-DB requirements
 
 ---
 
@@ -616,6 +677,7 @@ Plans:
 **Requirements:** IOT-MQTT-01, IOT-MQTT-02, IOT-MQTT-03
 
 **Success Criteria** (what must be TRUE):
+
   1. `docker compose up mosquitto` starts cleanly; `docker logs mosquitto` shows `Opening ipv4 listen socket on port 1883` — confirming the listener is active (not the Mosquitto 2.x silent-refusal default)
   2. `mosquitto_pub -h localhost -p 1883 -t test/ping -m hello` published from the host is echoed back by `mosquitto_sub -h localhost -p 1883 -t test/ping` — confirming anonymous connections are accepted
   3. `docker compose up api` starts without missing-env errors; `GET /api/v1/health` (or equivalent) returns 200 — confirming `MQTT_BROKER_HOST` and `MQTT_BROKER_PORT` are present in config
@@ -631,6 +693,7 @@ Plans:
 **Requirements:** IOT-CONS-01, IOT-CONS-02, IOT-CONS-03, IOT-CONS-04, IOT-WS-01, IOT-WS-02, IOT-WS-03, IOT-WS-04
 
 **Success Criteria** (what must be TRUE):
+
   1. Publishing a test MQTT message to `sensors/DEV-001/temperature` (value 42.0) results in a new row in `sensor_readings` within 1 second — confirming the consumer receives, parses, and persists via `asyncio.to_thread()` without blocking
   2. A WebSocket client connected to `ws://localhost:8000/api/v1/iot/ws/DEV-001` receives a JSON frame `{"device_id":"DEV-001","metric":"temperature","value":42.0,"ts":<ms>}` immediately after the MQTT publish — confirming the broadcast path
   3. `GET /api/v1/iot/readings/DEV-001?metric=temperature&limit=10` returns a JSON array of up to 10 readings in descending `recorded_at` order — confirming the REST backfill endpoint
@@ -648,6 +711,7 @@ Plans:
 **Requirements:** IOT-SIM-01, IOT-SIM-02, IOT-SIM-03
 
 **Success Criteria** (what must be TRUE):
+
   1. `python scripts/sensor_simulator.py` connects to Mosquitto and begins publishing; `docker logs` for the `api` service shows INSERT confirmations for all 6 metric keys (`temperature`, `humidity`, `power`, `current`, `vibration`, `running_hours`) within 30 seconds — confirming metric coverage matches `SENSOR_CONFIG`
   2. After 60 seconds of simulator running, `SELECT COUNT(*) FROM sensor_readings GROUP BY metric` shows ≥ 6 rows per metric per seeded device — confirming the 5-second interval and all device IDs are targeted
   3. `SIGINT` (Ctrl-C) on the simulator exits cleanly within 2 seconds with no `asyncio` exception traceback — confirming graceful `aiomqtt` shutdown
@@ -663,6 +727,7 @@ Plans:
 **Requirements:** IOT-FE-01, IOT-FE-02, IOT-FE-03, IOT-FE-04
 
 **Success Criteria** (what must be TRUE):
+
   1. Loading `/dashboard/iot` with the simulator running shows live-updating line charts within 5 seconds — `generateReadings()` import is absent from `iot/page.tsx` and charts populate from `useIotWebSocket` hook state
   2. On fresh page load (before the first WebSocket message), charts show historical data backfilled from `GET /api/v1/iot/readings/{device_id}` — no empty chart flash on initial mount
   3. `docker compose restart api` while the IoT page is open causes a momentary disconnect; the page auto-reconnects within 10 seconds and resumes streaming without a browser refresh
