@@ -24,3 +24,4 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 backend/model/*.pkl
+.planning/
