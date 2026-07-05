@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Backend Foundation
-status: Awaiting next milestone
-stopped_at: Milestone v2.0 started
-last_updated: "2026-07-05T07:09:14.156Z"
-last_activity: 2026-07-05 — Milestone v2.0 completed and archived
+milestone: v2.1
+milestone_name: IoT Pipeline & Real-Time Data
+status: planning
+last_updated: "2026-07-05T07:21:34.696Z"
+last_activity: 2026-07-05
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-30)
 
 ## Current Position
 
-Phase: Milestone v2.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-05 — Milestone v2.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-05 — Milestone v2.1 started
 
 ## Performance Metrics
 

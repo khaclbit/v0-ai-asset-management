@@ -33,16 +33,13 @@ Give teams a production-grade, enterprise-style asset management platform with r
 
 ### Active
 
-- [ ] IoT MQTT pipeline: Python sensor simulator → Mosquitto → FastAPI consumer → PostgreSQL sensor_readings — v2.1
-- [ ] AI predictive maintenance backend: ML model (Random Forest/XGBoost) + ai_recommendations API + Manager approval gate — v2.1
-- [ ] Notification delivery pipeline: event triggers → SSE endpoint → in-app notification center — v2.1
-- [ ] Real-time sensor data: WebSocket endpoint pushing sensor_readings to IoT Monitoring page — v2.1
+- [ ] IoT MQTT pipeline: Python sensor simulator → Mosquitto broker → FastAPI MQTT consumer → `sensor_readings` PostgreSQL table — v2.1
+- [ ] WebSocket real-time sensor data: FastAPI WebSocket endpoint pushing `sensor_readings` to IoT Monitoring page — v2.1
 
 ### Out of Scope
 
-- IoT MQTT pipeline and sensor simulator — deferred to v2.1
-- AI predictive maintenance backend (ML model, inference endpoint) — deferred to v2.1
-- Notification delivery pipeline — deferred to v2.1
+- AI predictive maintenance backend (ML model, inference endpoint) — deferred to v2.2
+- Notification delivery pipeline (SSE endpoint, in-app notification center) — deferred to v2.2
 - Production deployment / CI/CD — deferred until all features implemented
 
 ## Context
@@ -94,24 +91,23 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Prior milestones:** v1.0 architecture blueprint → v1.1 full English frontend rebuild → v1.2 complete SDD artifact set → v1.3 all 10 dashboard sections with mock data → v2.0 real backend.
 
-## Next Milestone: v2.1 IoT & AI Backend
+## Next Milestone: v2.1 IoT Pipeline & Real-Time Data
 
-**Goal:** Add IoT sensor pipeline, AI predictive maintenance model, and real-time notification delivery to complete the full-stack system.
+**Goal:** Build the IoT sensor data pipeline with real-time delivery to the frontend, replacing all mock sensor data.
 
 **Target features:**
-- Python sensor simulator → MQTT (Mosquitto) → FastAPI consumer → `sensor_readings` table
-- Scikit-learn ML model (Random Forest) → `ai_recommendations` table + Manager approval gate
-- SSE notification endpoint → in-app notification center
-- WebSocket real-time sensor data to IoT Monitoring page
-- User API — user management (Admin-only)
-- Assignment API — request/approve/reject/return workflow
-- Maintenance API — ticket creation + status transitions
-- Frontend wiring — replace mock store with real API calls
+- Python sensor simulator → MQTT (Mosquitto) → FastAPI MQTT consumer → `sensor_readings` table
+- FastAPI WebSocket endpoint → push live `sensor_readings` to IoT Monitoring page (replaces mock charts)
+
+**Deferred to v2.2+:**
+- AI predictive maintenance (Scikit-learn ML model, `ai_recommendations` table, Manager approval gate)
+- Notification delivery pipeline (event triggers → SSE endpoint → in-app notification center)
 
 **Constraints:**
-- No IoT, AI, or notification backends in this milestone (v2.1+)
-- Frontend UI stays the same — only data source changes
-- Alembic migrations for all schema changes
+- IoT pipeline additions only — no changes to existing Asset/Assignment/Maintenance/Auth APIs
+- Frontend UI stays the same — only IoT Monitoring data source changes
+- New Alembic migration for `sensor_readings` table
+- Docker Compose extended with Mosquitto broker service
 
 ---
-*Last updated: 2026-06-30 after v1.3 milestone completion, v2.0 started*
+*Last updated: 2026-07-05 after v2.0 milestone completion, v2.1 started*
