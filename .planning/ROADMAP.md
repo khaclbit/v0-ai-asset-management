@@ -720,7 +720,10 @@ Plans:
   2. After 60 seconds of simulator running, `SELECT COUNT(*) FROM sensor_readings GROUP BY metric` shows ≥ 6 rows per metric per seeded device — confirming the 5-second interval and all device IDs are targeted
   3. `SIGINT` (Ctrl-C) on the simulator exits cleanly within 2 seconds with no `asyncio` exception traceback — confirming graceful `aiomqtt` shutdown
 
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 34-01-PLAN.md — Create sensor_simulator.py + extend seed.py with seed_iot_assets()
 
 ---
 
