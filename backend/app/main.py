@@ -6,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.mqtt import start_mqtt_consumer
-from app.routers import auth, assets, users, assignments, maintenance, iot, ai
+from app.routers import auth, assets, users, assignments, maintenance, iot, ai, notifications
 from app.services.websocket_manager import connection_manager
+from app.services.notification_manager import notification_manager
 
 
 @asynccontextmanager
@@ -17,9 +18,10 @@ async def lifespan(app: FastAPI):
 
     yield  # app is running
 
-    # Shutdown: cancel consumer, close all WebSocket connections, wait for clean exit
+    # Shutdown: cancel consumer, close all WebSocket and SSE connections, wait for clean exit
     mqtt_task.cancel()
     await connection_manager.close_all()
+    await notification_manager.close_all()
     try:
         await mqtt_task
     except asyncio.CancelledError:
@@ -53,6 +55,7 @@ app.include_router(assignments.router, prefix=API_PREFIX)
 app.include_router(maintenance.router, prefix=API_PREFIX)
 app.include_router(iot.router, prefix=API_PREFIX)
 app.include_router(ai.router, prefix=API_PREFIX)
+app.include_router(notifications.router, prefix=API_PREFIX)
 
 
 @app.get("/api/v1/health", tags=["Health"])
