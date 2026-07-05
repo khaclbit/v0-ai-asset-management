@@ -4,6 +4,8 @@ from app.models.asset import Asset, AssetCategory, AssetStatus, ASSET_TRANSITION
 from app.models.assignment import Assignment, AssignmentStatus
 from app.models.maintenance import MaintenanceRecord, MaintenanceStatus, MAINTENANCE_TRANSITIONS
 from app.models.sensor_reading import SensorReading
+from app.models.ai_recommendation import AiRecommendation
+from app.models.notification import Notification
 
 __all__ = [
     "Base",
@@ -19,4 +21,6 @@ __all__ = [
     "MaintenanceStatus",
     "MAINTENANCE_TRANSITIONS",
     "SensorReading",
+    "AiRecommendation",
+    "Notification",
 ]

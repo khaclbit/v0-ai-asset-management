@@ -17,6 +17,8 @@ from app.models.asset import Asset  # noqa: F401
 from app.models.assignment import Assignment  # noqa: F401
 from app.models.maintenance import MaintenanceRecord  # noqa: F401
 from app.models.sensor_reading import SensorReading  # noqa: F401
+from app.models.ai_recommendation import AiRecommendation  # noqa: F401
+from app.models.notification import Notification  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
