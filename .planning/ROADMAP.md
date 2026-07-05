@@ -602,7 +602,10 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
   2. `EXPLAIN` on `SELECT … WHERE device_id = ? AND metric = ? AND recorded_at > ?` uses the composite index `(device_id, metric, recorded_at DESC)` — no sequential scan
   3. A manual INSERT into `sensor_readings` with a `device_id` that has no matching row in `assets` succeeds without FK violation — confirming the intentional no-FK design
 
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 31-01-PLAN.md — Create SensorReading model, migration 0002, register in env.py, verify all three IOT-DB requirements
 
 ---
 
