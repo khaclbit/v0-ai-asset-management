@@ -4,8 +4,8 @@ milestone: v2.0
 milestone_name: Backend Foundation
 status: executing
 stopped_at: Milestone v2.0 started
-last_updated: "2026-07-05T06:00:29.076Z"
-last_activity: 2026-07-05 -- Phase 21 execution started
+last_updated: "2026-07-05T06:03:51.855Z"
+last_activity: 2026-07-05 -- Phase 25 execution started
 progress:
   total_phases: 6
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-30)
 
 **Core value:** Production-grade FastAPI + PostgreSQL backend with JWT/RBAC auth, core domain APIs, and frontend wired to real data.
-**Current focus:** Phase 21 — asset-assignment-maintenance-refinement
+**Current focus:** Phase 25 — backend-scaffold-docker-environment
 
 ## Current Position
 
-Phase: 21 (asset-assignment-maintenance-refinement) — EXECUTING
+Phase: 25 (backend-scaffold-docker-environment) — EXECUTING
 Plan: 1 of 1
-Status: Executing Phase 21
-Last activity: 2026-07-05 -- Phase 21 execution started
+Status: Executing Phase 25
+Last activity: 2026-07-05 -- Phase 25 execution started
 
 ## Performance Metrics
 
