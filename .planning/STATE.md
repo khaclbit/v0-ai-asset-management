@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: IoT Pipeline & Real-Time Data
-status: archived
-stopped_at: Milestone v2.0 started
-last_updated: "2026-07-05T15:45:33.955Z"
-last_activity: 2026-07-05 -- v2.1 milestone archived
+milestone: v2.2
+milestone_name: AI Predictive Maintenance & Notifications
+status: planning
+last_updated: "2026-07-05T16:42:19.263Z"
+last_activity: 2026-07-05
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-06-30)
 
 ## Current Position
 
-Phase: 32 — COMPLETE
-Plan: 1 of ?
-Status: Phase 32 complete
-Last activity: 2026-07-05 -- Phase 32 marked complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-05 — Milestone v2.2 started
 
 ## Performance Metrics
 
