@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { Topbar } from "@/components/topbar"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -16,6 +16,7 @@ import { useStore } from "@/lib/store"
 import { type AssetCategory } from "@/lib/data"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from "recharts"
 import { cn } from "@/lib/utils"
+import { useIotWebSocket } from "@/hooks/useIotWebSocket"
 
 // ── Sensor configuration ──────────────────────────────────────────────────────
 
@@ -71,28 +72,7 @@ const WINDOWS = [
   { label: "7d", hours: 168 },
 ]
 
-// ── Mock data generation ──────────────────────────────────────────────────────
-
-function seedValue(str: string) {
-  return [...str].reduce((acc, c) => acc + c.charCodeAt(0), 0)
-}
-
-function generateReadings(assetId: string, sensorKey: SensorKey, baseValue: number, windowHours: number) {
-  const points = windowHours <= 1 ? 12 : windowHours <= 6 ? 36 : windowHours <= 24 ? 48 : 84
-  const interval = (windowHours * 3600 * 1000) / points
-  const seed = seedValue(assetId + sensorKey)
-  const now = Date.now()
-  return Array.from({ length: points }, (_, i) => {
-    const noise = Math.sin(i * 0.4 + seed * 0.01) * 0.12 + Math.cos(i * 0.9 + seed * 0.03) * 0.06
-    const value = Math.round(baseValue * (1 + noise) * 10) / 10
-    return { ts: now - (points - 1 - i) * interval, value }
-  })
-}
-
-function getLatestValue(assetId: string, sensorKey: SensorKey, baseValue: number) {
-  const readings = generateReadings(assetId, sensorKey, baseValue, 1)
-  return readings[readings.length - 1]?.value ?? baseValue
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatXAxis(ts: number, windowHours: number) {
   const d = new Date(ts)
@@ -112,12 +92,15 @@ function getValueState(value: number, warning: number, critical: number): "norma
   return "normal"
 }
 
-function getAssetSensorStatus(assetId: string, category: AssetCategory): "online" | "warning" | "violation" {
+function getAssetSensorStatus(
+  readings: Record<string, { ts: number; value: number }[]>,
+  category: AssetCategory,
+): "online" | "warning" | "violation" {
   const sensors = SENSOR_CATEGORY_MAP[category]
   for (const key of sensors) {
     const cfg = SENSOR_CONFIG[key]
-    const base = cfg.baseValues[category]
-    const v = getLatestValue(assetId, key, base)
+    const pts = readings[key]
+    const v = pts?.length ? pts[pts.length - 1].value : cfg.baseValues[category]
     if (v > cfg.critical) return "violation"
     if (v > cfg.warning) return "warning"
   }
@@ -129,10 +112,7 @@ function getAssetSensorStatus(assetId: string, category: AssetCategory): "online
 export default function IoTMonitoringPage() {
   const { assets } = useStore()
 
-  const monitoredAssets = useMemo(
-    () => assets.filter((a) => a.sensorDeviceId != null && a.status !== "retired"),
-    [assets],
-  )
+  const monitoredAssets = assets.filter((a) => a.sensorDeviceId != null && a.status !== "retired")
 
   const [selectedId, setSelectedId] = useState<string>(() => monitoredAssets[0]?.id ?? "")
   const [windowHours, setWindowHours] = useState(6)
@@ -141,20 +121,21 @@ export default function IoTMonitoringPage() {
 
   const sensorKeys = selectedAsset ? SENSOR_CATEGORY_MAP[selectedAsset.category] : []
 
-  const readings = useMemo(() => {
-    if (!selectedAsset) return {} as Record<SensorKey, { ts: number; value: number }[]>
-    return Object.fromEntries(
-      sensorKeys.map((key) => [
-        key,
-        generateReadings(
-          selectedAsset.id,
-          key,
-          SENSOR_CONFIG[key].baseValues[selectedAsset.category],
-          windowHours,
-        ),
-      ]),
-    ) as Record<SensorKey, { ts: number; value: number }[]>
-  }, [selectedAsset, sensorKeys, windowHours])
+  const { readings: wsReadings, status: wsStatus } = useIotWebSocket(
+    selectedAsset?.sensorDeviceId ?? null,
+    sensorKeys,
+  )
+
+  // Derive latest value per metric from live readings state (fallback to base value when no data)
+  const getLatestFromState = (key: SensorKey, fallback: number): number => {
+    const pts = wsReadings[key]
+    return pts?.length ? pts[pts.length - 1].value : fallback
+  }
+
+  // Sidebar status uses live readings for selected asset; "online" for others (not yet monitored)
+  const selectedStatus = selectedAsset
+    ? getAssetSensorStatus(wsReadings, selectedAsset.category)
+    : "online"
 
   return (
     <>
@@ -170,8 +151,9 @@ export default function IoTMonitoringPage() {
           ) : (
             <div className="space-y-0.5">
               {monitoredAssets.map((a) => {
-                const status = getAssetSensorStatus(a.id, a.category)
                 const isSelected = a.id === selectedId
+                // Use live readings for selected asset; show "online" for others
+                const status = isSelected ? selectedStatus : "online"
                 return (
                   <button
                     key={a.id}
@@ -210,7 +192,19 @@ export default function IoTMonitoringPage() {
               {/* Header */}
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-lg font-semibold">{selectedAsset.name}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{selectedAsset.name}</h2>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-xs",
+                        wsStatus === "connected" && "bg-chart-3/20 text-chart-3",
+                        wsStatus === "connecting" && "bg-chart-4/20 text-chart-4",
+                        wsStatus === "disconnected" && "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {wsStatus}
+                    </span>
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {selectedAsset.serial} · {selectedAsset.category} · {selectedAsset.sensorDeviceId}
                   </p>
@@ -235,7 +229,7 @@ export default function IoTMonitoringPage() {
                 {sensorKeys.map((key) => {
                   const cfg = SENSOR_CONFIG[key]
                   const base = cfg.baseValues[selectedAsset.category]
-                  const latest = getLatestValue(selectedAsset.id, key, base)
+                  const latest = getLatestFromState(key, base)
                   const state = getValueState(latest, cfg.warning, cfg.critical)
                   return (
                     <Card
@@ -279,7 +273,9 @@ export default function IoTMonitoringPage() {
               <div className="space-y-6">
                 {sensorKeys.map((key) => {
                   const cfg = SENSOR_CONFIG[key]
-                  const data = readings[key] ?? []
+                  // Filter wsReadings to the selected time window for display
+                  const cutoff = Date.now() - windowHours * 3600_000
+                  const data = (wsReadings[key] ?? []).filter((p) => p.ts >= cutoff)
                   const chartConfig = {
                     value: { label: `${cfg.label} (${cfg.unit.trim()})`, color: cfg.color },
                   }

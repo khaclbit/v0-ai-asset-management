@@ -207,3 +207,36 @@ export const usersApi = {
   deactivate: (id: string) =>
     apiFetch<ApiUser>(`/users/${id}/deactivate`, { method: "POST" }),
 }
+
+// ─── IoT ─────────────────────────────────────────────────────────────────────
+
+export interface SensorReadingOut {
+  id: string
+  device_id: string
+  asset_id: string | null
+  metric: string
+  value: number
+  unit: string
+  recorded_at: string // ISO 8601 datetime string
+}
+
+export const iotApi = {
+  /**
+   * Fetch last N readings for a device (oldest-first, ready for chart rendering).
+   * Optionally filter by metric name.
+   */
+  getHistory: (deviceId: string, metric?: string, limit = 200): Promise<SensorReadingOut[]> => {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (metric) params.set("metric", metric)
+    return apiFetch<SensorReadingOut[]>(`/iot/readings/${deviceId}?${params}`)
+  },
+
+  /**
+   * Derive the WebSocket URL from NEXT_PUBLIC_API_URL by swapping http(s) → ws(s).
+   * e.g. http://localhost:8000/api/v1 → ws://localhost:8000/api/v1/iot/ws/{deviceId}
+   */
+  getWsUrl: (deviceId: string): string => {
+    const wsBase = BASE_URL.replace(/^https?/, (s) => (s === "https" ? "wss" : "ws"))
+    return `${wsBase}/iot/ws/${deviceId}`
+  },
+}
