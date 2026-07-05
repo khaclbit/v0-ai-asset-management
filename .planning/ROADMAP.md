@@ -4,6 +4,8 @@
 
 - ✅ **v1.0 milestone** — shipped 2026-06-09 (4 phases, 5 plans). Full archive: `.planning/milestones/v1.0-ROADMAP.md`
 - ✅ **v2.0 Backend Foundation** — shipped 2026-07-05 (6 phases, 6 plans). Full archive: `.planning/milestones/v2.0-ROADMAP.md`
+- ✅ **v2.1 IoT Pipeline** — shipped 2026-07-05 (5 phases, 11 requirements). Full archive: `.planning/milestones/v2.1-ROADMAP.md`
+- ✅ **v2.2 AI Predictive Maintenance & Notifications** — shipped 2026-07-06 (6 phases, 11 requirements). Full archive: `.planning/milestones/v2.2-ROADMAP.md`
 
 ---
 
@@ -653,111 +655,21 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 
 ---
 
-## v2.2: AI Predictive Maintenance & Notifications
 
-- [x] **Phase 36: DB Schema — AI & Notifications Migrations** — Alembic migrations 0003 + 0004 create `ai_recommendations` and `notifications` tables with all columns, FK constraints, and indexes *(REQ: AI-01, NOTIF-01)*
-- [x] **Phase 37: Offline Training Script** — `scripts/train_model.py` engineers per-asset features from `sensor_readings` (7-day window), trains RandomForestClassifier, serialises `model.pkl` + `feature_columns.pkl` to `backend/app/ai/` *(REQ: AI-02)*
-- [x] **Phase 38: AI Inference & Recommendation Endpoints** — `app/services/ai_service.py` loads model once at import; `app/routers/ai.py` exposes `POST /ai/recommendations` (inference + persist), `GET /ai/recommendations` (list + filter), `POST /ai/recommendations/{id}/approve` and `/{id}/defer` (Manager/Admin gate) *(REQ: AI-03, AI-04, AI-05)*
-- [x] **Phase 39: SSE Infrastructure — NotificationManager & Stream Endpoint** — `app/services/notification_manager.py` singleton (asyncio.Queue per user, asyncio.Lock, mirrors ConnectionManager); `app/routers/notifications.py` exposes `GET /notifications/stream` (token query-param auth, heartbeat loop), `GET /notifications`, `PATCH /notifications/{id}/read`, `POST /notifications/read-all` *(REQ: NOTIF-03, NOTIF-04)*
-- [x] **Phase 40: Wire Notification Triggers** — surgical edits to `consumer.py` (threshold breach → notify all Managers/Admins), `assignments.py` router (async def + to_thread; notify assignee on create/return), `maintenance.py` router (async def + to_thread; notify requester on status change) *(REQ: NOTIF-02)*
-- [x] **Phase 41: Frontend AI & Notifications Wiring** — `useNotifications.ts` SSE hook replaces `SEED_NOTIFICATIONS`, calls store's prepend-notification action for live badge count; AI Predictive page (`/dashboard/ai`) replaces `seedRecommendations` mock with real `ai_recommendations` API; approve/defer dialogs call real endpoints; response maps to `PredictiveRecommendation` type exactly *(REQ: AI-06, NOTIF-05)*
+<details>
+<summary>✅ v2.2: AI Predictive Maintenance & Notifications — 6 phases, 11 requirements, shipped 2026-07-06</summary>
 
-### Phase Details
+- [x] Phase 36: DB Schema — Alembic migrations 0003 (ai_recommendations) + 0004 (notifications)
+- [x] Phase 37: Offline Training Script — scripts/train_model.py, 18-feature RF, model.pkl
+- [x] Phase 38: AI Inference & Recommendation Endpoints — ai_service.py, 4 endpoints, RBAC approve/defer
+- [x] Phase 39: SSE Infrastructure — NotificationManager singleton, stream endpoint + 3 REST endpoints
+- [x] Phase 40: Wire Notification Triggers — MQTT threshold + assignment + maintenance triggers
+- [x] Phase 41: Frontend AI & Notifications Wiring — useNotifications hook, AI page + Notifications page wired; 0 TS errors
 
-#### Phase 36: DB Schema — AI & Notifications Migrations
-**Goal**: Both new tables exist in PostgreSQL with correct columns, constraints, and indexes — AI inference and notification persistence can begin without further schema work.
-**Depends on**: Phase 35
-**Requirements**: AI-01, NOTIF-01
-**Success Criteria** (what must be TRUE):
-  1. `alembic upgrade head` runs cleanly from a fresh DB and creates `ai_recommendations` with all required columns (id, asset_id FK, recommendation_type, confidence, feature_snapshot JSON, status, approved_by FK nullable, approved_at nullable, created_at)
-  2. `alembic upgrade head` creates `notifications` with all required columns (id, user_id FK, type, title, message, is_read, reference_id nullable, reference_type nullable, created_at)
-  3. `alembic downgrade -1` and `alembic upgrade head` cycle completes without error (migrations are reversible)
-  4. Both tables have the expected indexes visible in `\d+ ai_recommendations` / `\d+ notifications` (asset_id+created_at DESC; user_id+is_read; user_id+created_at DESC)
-**Plans**: 3 plans
+Full details: `.planning/milestones/v2.2-ROADMAP.md`
 
-Plans:
-- [ ] 36-01-PLAN.md — Write Alembic migrations 0003 (ai_recommendations) + 0004 (notifications)
-- [ ] 36-02-PLAN.md — Write ORM models AiRecommendation + Notification
-- [ ] 36-03-PLAN.md — Register models in __init__.py + apply migration + verify schema
-
-#### Phase 37: Offline Training Script
-**Goal**: A runnable script produces a trained model artefact that the inference service can load — enabling AI recommendations backed by real sensor history.
-**Depends on**: Phase 36
-**Requirements**: AI-02
-**Success Criteria** (what must be TRUE):
-  1. Running `python scripts/train_model.py` completes without error and writes `backend/app/ai/model.pkl` and `backend/app/ai/feature_columns.pkl`
-  2. Script prints a summary of training data size, feature columns used, and held-out accuracy/precision/recall
-  3. Feature vector aligns exactly with the 8-column spec (avg_temperature_7d, max_temperature_7d, avg_vibration_7d, spike_count_7d, reading_count_7d, repair_count, usage_hours_per_week, warranty_months); missing-metric defaults to 0.0 (no NaN)
-  4. Re-running the script overwrites the existing pkl files without error (idempotent)
-**Plans**: TBD
-
-#### Phase 38: AI Inference & Recommendation Endpoints
-**Goal**: Authenticated users can trigger AI analysis on any sensor-equipped asset and retrieve recommendations; Managers/Admins can approve or defer them — all backed by the trained model and `ai_recommendations` table.
-**Depends on**: Phase 37
-**Requirements**: AI-03, AI-04, AI-05
-**Success Criteria** (what must be TRUE):
-  1. `POST /api/v1/ai/recommendations` with a valid `asset_id` returns a JSON object matching the `PredictiveRecommendation` type (recommendation_type, confidence 0–1, risk_level, top_factors list) and persists a row in `ai_recommendations`
-  2. `GET /api/v1/ai/recommendations` returns all rows sorted by risk_level desc, confidence desc; `?asset_id=<uuid>` filter narrows results correctly
-  3. `POST /api/v1/ai/recommendations/{id}/approve` (Manager/Admin) sets `action_state="approved"`, records `approved_by` + `approved_at`; returns 403 for Employee role
-  4. `POST /api/v1/ai/recommendations/{id}/defer` (Manager/Admin) sets `action_state="deferred"`, persists optional `defer_reason`
-  5. Model is loaded once at module import; repeated `POST` calls do not re-load pkl from disk (verified by log output)
-**Plans**: TBD
-**UI hint**: yes
-
-#### Phase 39: SSE Infrastructure — NotificationManager & Stream Endpoint
-**Goal**: A connected browser client receives real-time notification events over SSE, and can fetch, read, and bulk-clear past notifications via REST — the full notification delivery layer is live.
-**Depends on**: Phase 36
-**Requirements**: NOTIF-03, NOTIF-04
-**Success Criteria** (what must be TRUE):
-  1. `GET /api/v1/notifications/stream?token=<jwt>` responds with `Content-Type: text/event-stream`, sends an immediate `event: connected` heartbeat, and streams `event: notification` messages as they are pushed to the user's queue
-  2. Invalid or missing `token` returns 401 before the stream opens (no partial connection)
-  3. `GET /api/v1/notifications` returns the authenticated user's notifications sorted by `created_at` desc
-  4. `PATCH /api/v1/notifications/{id}/read` sets `is_read=true` for the specified notification; `POST /api/v1/notifications/read-all` marks all of the user's notifications as read
-  5. Disconnecting the SSE client (browser tab close / network drop) removes the user's queue from `NotificationManager` cleanly — no goroutine/task leak
-**Plans**: TBD
-
-#### Phase 40: Wire Notification Triggers
-**Goal**: Relevant system events automatically create notification rows and push them to connected SSE clients — Managers see sensor alerts, users see their assignment and maintenance updates in real time.
-**Depends on**: Phase 39
-**Requirements**: NOTIF-02
-**Success Criteria** (what must be TRUE):
-  1. A simulated MQTT sensor reading that breaches a threshold (e.g. temperature > 75°C) causes a `notifications` row to be inserted for each Manager/Admin and the event appears on their open SSE stream within one publish interval
-  2. Creating or returning an assignment inserts a notification for the assignee; the assignee's open SSE stream receives the event immediately
-  3. Changing a maintenance record's status inserts a notification for the requester; the requester's SSE stream receives the event immediately
-  4. If the target user has no open SSE connection, the notification row is still persisted (DB write succeeds) so it appears on next `GET /notifications` — no event is lost
-**Plans**: TBD
-
-#### Phase 41: Frontend AI & Notifications Wiring
-**Goal**: The AI Predictive Maintenance page and Notifications page show live data from the real backend — all mock seeds removed, approve/defer/read actions call real endpoints, and the bell badge reflects live unread count.
-**Depends on**: Phase 40
-**Requirements**: AI-06, NOTIF-05
-**Success Criteria** (what must be TRUE):
-  1. `/dashboard/ai` page loads real recommendations from `GET /api/v1/ai/recommendations`; `seedRecommendations` import is gone; TypeScript compiles with 0 errors (response shape matches `PredictiveRecommendation` exactly)
-  2. Approve and defer dialogs on the AI page call `POST /api/v1/ai/recommendations/{id}/approve` and `/{id}/defer` respectively and reflect the updated `action_state` without a page reload
-  3. `useNotifications` hook establishes SSE connection via `EventSource` with `?token=<jwt>`; incoming events are prepended to `useStore().notifications[]` and `unreadCount` increments immediately
-  4. The notification bell badge in the nav shows the correct live unread count; opening the Notifications page shows real notifications from the store
-  5. Mark-as-read and mark-all-read buttons on the Notifications page call the correct REST endpoints and update `is_read` state in the store without a full page reload
-**Plans**: TBD
-**UI hint**: yes
-
-### v2.2 Requirement Traceability
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| AI-01 | Phase 36 | Pending |
-| NOTIF-01 | Phase 36 | Pending |
-| AI-02 | Phase 37 | Pending |
-| AI-03 | Phase 38 | Pending |
-| AI-04 | Phase 38 | Pending |
-| AI-05 | Phase 38 | Pending |
-| NOTIF-03 | Phase 39 | Pending |
-| NOTIF-04 | Phase 39 | Pending |
-| NOTIF-02 | Phase 40 | Pending |
-| AI-06 | Phase 41 | Pending |
-| NOTIF-05 | Phase 41 | Pending |
-
-**v2.2 Coverage: 11/11 requirements mapped ✓**
+</details>
 
 ---
-*v2.2 roadmap appended: 2026-07-05 for milestone v2.2 AI Predictive Maintenance & Notifications*
+*v2.2 roadmap archived: 2026-07-06*
 

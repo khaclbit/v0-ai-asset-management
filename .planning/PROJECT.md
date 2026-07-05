@@ -30,16 +30,23 @@ Give teams a production-grade, enterprise-style asset management platform with r
 - ✓ Asset API: paginated CRUD + lifecycle state machine with 409 guards — v2.0
 - ✓ User, Assignment & Maintenance APIs: full workflow with asset.status sync, business rule enforcement — v2.0
 - ✓ Frontend wired to real FastAPI backend with graceful demo-mode fallback — v2.0
+- ✓ IoT MQTT pipeline: sensor_simulator.py → Mosquitto → FastAPI MQTT consumer → sensor_readings PostgreSQL table — v2.1
+- ✓ WebSocket real-time sensor data: FastAPI WebSocket endpoint pushing sensor_readings to IoT Monitoring page — v2.1
+- ✓ AI predictive maintenance: RandomForest model + inference endpoint + Manager approval gate + ai_recommendations table — v2.2
+- ✓ SSE notification delivery: NotificationManager + stream endpoint + notification triggers (MQTT threshold + assignment + maintenance) — v2.2
+- ✓ Frontend wired to real AI and notification APIs: useNotifications SSE hook, AI page + Notifications page live — v2.2
 
 ### Active
 
 - [ ] IoT MQTT pipeline: Python sensor simulator → Mosquitto broker → FastAPI MQTT consumer → `sensor_readings` PostgreSQL table — v2.1
 - [ ] WebSocket real-time sensor data: FastAPI WebSocket endpoint pushing `sensor_readings` to IoT Monitoring page — v2.1
+- [ ] AI predictive maintenance: ML model + inference endpoint + Manager approval gate — v2.2
+- [ ] SSE notification delivery pipeline — v2.2
 
 ### Out of Scope
 
-- AI predictive maintenance backend (ML model, inference endpoint) — deferred to v2.2
-- Notification delivery pipeline (SSE endpoint, in-app notification center) — deferred to v2.2
+- AI predictive maintenance backend (ML model, inference endpoint) — deferred to v2.2 → ✅ SHIPPED v2.2
+- Notification delivery pipeline (SSE endpoint, in-app notification center) — deferred to v2.2 → ✅ SHIPPED v2.2
 - Production deployment / CI/CD — deferred until all features implemented
 
 ## Context
@@ -87,26 +94,17 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Current State
 
-**v2.1 shipped (2026-07-05):** Full IoT sensor telemetry pipeline live. `sensor_simulator.py` publishes 6 metrics for 5 device IDs via Mosquitto MQTT → FastAPI consumer persists to `sensor_readings` table (PostgreSQL) via `asyncio.to_thread()` → WebSocket broadcast to `useIotWebSocket` hook → live line charts on `/dashboard/iot`. `generateReadings()` mock fully removed. 0 TypeScript errors.
+**v2.2 shipped (2026-07-06):** Full AI predictive maintenance and SSE notification pipeline live. Scikit-learn Random Forest model trained on sensor_readings history produces risk-ranked `ai_recommendations`. SSE `NotificationManager` (asyncio.Queue per user, multi-tab safe) delivers real-time notifications for MQTT threshold breaches, assignment events, and maintenance status changes. `useNotifications` SSE hook + AI page + Notifications page fully wired; 0 TypeScript errors. Pending: `alembic upgrade head` when Docker restarts.
 
-**Prior milestones:** v1.0 architecture → v1.1 English frontend → v1.2 SDD artifacts → v1.3 mock dashboards → v2.0 real backend → v2.1 live IoT pipeline.
+**Prior milestones:** v1.0 architecture → v1.1 English frontend → v1.2 SDD artifacts → v1.3 mock dashboards → v2.0 real backend → v2.1 live IoT pipeline → v2.2 AI + notifications.
 
-## Next Milestone: v2.2 AI Predictive Maintenance & Notifications
+## Next Milestone: v2.3 (TBD)
 
-**Goal:** Add AI-driven maintenance recommendations powered by sensor history, plus real-time in-app notification delivery via SSE.
-
-**Target features:**
-- Scikit-learn Random Forest model trained on `sensor_readings` → `ai_recommendations` table
-- `POST /api/v1/ai/recommendations` inference endpoint + Manager approval gate
-- AI Predictive Maintenance page wired to real `ai_recommendations` API
-- SSE endpoint `/api/v1/notifications/stream` for real-time notification delivery
-- Notification bell badge + Notifications page replace mock data
-
-**Deferred from v2.1:**
-- WebSocket auth (`?token=` query param)
-- Sensor simulator as Docker Compose service
-- `sensor_device_id` in `GET /assets` API response
-- MQTT threshold alerting (breach events → alerts table)
-
----
-*Last updated: 2026-07-05 after v2.1 milestone completion*
+**Candidates (from tech debt + backlog):**
+- Redis-backed alert cooldown (replace in-memory `_last_alerted`)
+- `asset_name` JOIN in AI recommendations response
+- CI/CD pipeline (GitHub Actions: lint → test → build → deploy)
+- Production deployment (Docker registry, environment config, health checks)
+- Integration tests for SSE stream + AI inference endpoints
+- Audit Log page wired to real backend
+- Reports page analytics wired to real aggregation queries
