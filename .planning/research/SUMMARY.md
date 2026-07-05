@@ -1,287 +1,277 @@
-# v2.1 IoT Research Summary
+# v2.2 Research Summary — AI Predictive Maintenance & Notifications
 
 **Project:** AI-Powered Asset Management System  
-**Milestone:** v2.1 — IoT Pipeline & Real-Time Data  
+**Milestone:** v2.2 — AI Predictive Maintenance & SSE Notification Delivery  
 **Synthesized:** 2026-07-05  
-**Sources:** STACK.md · FEATURES.md · ARCHITECTURE.md · PITFALLS.md · PROJECT.md
+**Sources:** STACK.md · FEATURES.md · PITFALLS.md · PROJECT.md  
+**Note:** ARCHITECTURE.md was not produced by parallel researchers (gap flagged below). STACK.md / FEATURES.md / PITFALLS.md reflect v2.1 IoT baseline — used here as dependency context for v2.2.
 
 ---
 
 ## Executive Summary
 
-v2.1 adds a complete MQTT-based sensor telemetry pipeline to an existing FastAPI + PostgreSQL backend that is **synchronous throughout** — `create_engine`, `sessionmaker`, `psycopg2-binary`, and all routers use `def`, not `async def`. This sync baseline is the dominant constraint on every IoT design decision. The pipeline reads: Python sensor simulator → Mosquitto MQTT broker → FastAPI `aiomqtt` consumer → PostgreSQL `sensor_readings` table → WebSocket broadcast → Next.js IoT Monitoring page. Only **one new Python package** is required (`aiomqtt==2.5.1`); WebSocket support is already provided by the Starlette dependency bundled with FastAPI.
+v2.2 extends the now-live IoT pipeline (v2.1) with two independent capability pillars: **AI-driven predictive maintenance** and **real-time SSE notification delivery**. The AI pillar trains a scikit-learn Random Forest classifier on the `sensor_readings` table already populated by the v2.1 MQTT pipeline, generates maintenance recommendations into a new `ai_recommendations` table, and exposes an inference endpoint gated behind a Manager approval workflow. The notification pillar introduces an SSE endpoint (`/api/v1/notifications/stream`) and a `notifications` table so that threshold breaches, AI recommendations, and assignment events deliver real-time in-app alerts — replacing the mock notification center shipped in v1.3. Both pillars share the same sync-SQLAlchemy baseline constraint inherited from v2.0/v2.1, meaning blocking operations (model inference, DB writes) must be offloaded to `asyncio.to_thread()` exactly as the MQTT consumer already does.
 
-The frontend already has all six sensor metrics defined (`temperature`, `humidity`, `power`, `current`, `vibration`, `running_hours`) in a `SENSOR_CONFIG` constant with per-category assignments, threshold values, and a chart data contract of `{ ts: number, value: number }`. This means the v2.1 backend must conform to what the frontend already expects — zero UI redesign, zero new constants, zero schema negotiation. The simulator must emit exactly these six metric keys on the topic structure `sensors/{device_id}/{metric}`, and the WebSocket message must include `ts` (Unix ms) and `value` fields that drop straight into the existing chart state.
+The frontend AI Predictive Maintenance page (`/dashboard/ai`) and Notifications page (`/dashboard/notifications`) were fully built with mock data in v1.3 and wired to nothing. v2.2 connects them to real APIs with zero UI redesign. The notification bell badge already drives from an in-memory mock counter; in v2.2 it reads from the live `notifications` endpoint. The AI risk cards already render from a static array; they will render from `GET /api/v1/ai/recommendations`. Because the UI contracts were frozen in v1.3, API response shapes must match the existing frontend interfaces — not the other way around.
 
-The two highest-risk integration points are (1) crossing the sync/async boundary for DB writes — the MQTT consumer is async but SQLAlchemy is sync, requiring `asyncio.to_thread()` — and (2) the Mosquitto 2.x configuration change that silently refuses all connections when `listener` + `allow_anonymous` are absent from `mosquitto.conf`. Both risks are well-understood and fully preventable with patterns documented in PITFALLS.md.
-
----
-
-## Stack Additions
-
-| Component | Version / Image | Notes |
-|-----------|----------------|-------|
-| **aiomqtt** | `2.5.1` | Only new Python package; pulls `paho-mqtt>=2.1.0` as transitive dep — do NOT pin paho-mqtt separately |
-| **Mosquitto broker** | `eclipse-mosquitto:2.0.22` | New Docker Compose service; pinned (not `latest`) for reproducibility |
-| **WebSocket** | _(no new package)_ | Already available via `fastapi.WebSocket` from bundled Starlette ≥0.40 |
-| **psycopg2-binary** | _(existing, unchanged)_ | Sync driver; MQTT consumer uses `asyncio.to_thread()` — no asyncpg needed |
-
-**`requirements.txt` change:**
-```
-aiomqtt==2.5.1
-```
-That is the entire Python dependency change for v2.1.
-
-**New Docker resources:**
-- Service: `mosquitto` (ports `1883`, optionally `9001`)
-- Volumes: `mosquitto_data`, `mosquitto_log`
-- Bind mount: `./mosquitto/config/mosquitto.conf` (read-only)
-- `api` service: add `depends_on: mosquitto` + `MQTT_HOST=mosquitto` env var
+The highest-risk areas are: (1) sklearn model training inside a FastAPI async process — inference is CPU-bound and must run in `asyncio.to_thread()` to avoid blocking the event loop; (2) SSE connection lifetime management — SSE connections are long-lived HTTP streams and require a `ConnectionManager`-equivalent with proper cleanup on client disconnect; (3) training data cold start — the model cannot produce useful predictions if `sensor_readings` is empty or has too few samples, requiring a graceful fallback; and (4) the Manager approval gate — the `ai_recommendations` state machine (`pending → approved / rejected`) must be enforced server-side with role checks, not client-side.
 
 ---
 
-## Feature Scope (Table Stakes for v2.1)
+## Stack Additions for v2.2
 
-All features anchor to the existing frontend `SENSOR_CONFIG` in `frontend/app/dashboard/iot/page.tsx`.
+The v2.1 stack (`aiomqtt==2.5.1`, `eclipse-mosquitto:2.0.22`, FastAPI + Starlette WebSocket, sync SQLAlchemy + psycopg2-binary) is the stable baseline. v2.2 requires exactly three Python additions:
 
-### Must Build
+| Component | Version | Rationale |
+|-----------|---------|-----------|
+| **scikit-learn** | `1.5.x` (latest stable) | Random Forest classifier; industry-standard for tabular sensor data; no GPU needed |
+| **joblib** | _(scikit-learn transitive dep)_ | Model serialization (`joblib.dump` / `joblib.load`); already pulled by sklearn — do NOT pin separately |
+| **sse-starlette** | `2.x` (latest) | `EventSourceResponse` for SSE; FastAPI native `StreamingResponse` can do SSE but `sse-starlette` adds reconnect ID, Last-Event-ID header handling, and clean generator protocol |
+| **pandas** | `2.x` (latest stable) | Feature engineering from `sensor_readings` rows before sklearn fit/predict; optional but strongly recommended for readable data prep |
+| **numpy** | _(pandas/sklearn transitive dep)_ | Do NOT pin separately |
+
+**`requirements.txt` additions (v2.2):**
+```
+scikit-learn>=1.5.0,<2.0.0
+sse-starlette>=2.0.0,<3.0.0
+pandas>=2.0.0,<3.0.0
+```
+`joblib` and `numpy` are transitive — no separate pins.
+
+**No new Docker services.** The existing `db` (PostgreSQL 16) + `mosquitto` + `api` compose stack is sufficient. The trained model artifact is stored on the filesystem inside the `api` container (e.g., `app/models/rf_model.joblib`), loaded once at startup into a module-level singleton.
+
+**What NOT to add:**
+- MLflow / model registry — overkill for single-model demo; file-based joblib is sufficient
+- Celery / task queues — training runs once; inference is fast RF prediction; asyncio.to_thread() is enough
+- Redis pub/sub for SSE fan-out — in-process `asyncio.Queue` per connection is sufficient at this scale
+- PyTorch / TensorFlow — Random Forest on tabular sensor data outperforms neural nets with far less complexity
+- `httpx` / external ML API calls — all inference is local; no external ML services needed
+
+---
+
+## Feature Scope (Table Stakes for v2.2)
+
+### Must Build — AI Predictive Maintenance Pillar
 
 | Feature | What It Does | Key Constraint |
 |---------|-------------|----------------|
-| **Alembic migration 0002** | Creates `sensor_readings` table (id, device_id, metric, value, unit, recorded_at) | `down_revision = "0001"`; no FK to `assets` — device_id string match keeps ingestion path fast |
-| **Mosquitto Docker service** | MQTT message bus for simulator ↔ consumer | Requires `mosquitto.conf` with `listener 1883` + `allow_anonymous true` — Mosquitto 2.x silently blocks without this |
-| **Sensor simulator** (`scripts/sensor_simulator.py`) | Publishes synthetic readings for seeded assets | Must emit exactly 6 metric keys matching `SENSOR_CONFIG`; 5s interval; reads `sensor_device_id` from DB |
-| **FastAPI MQTT consumer** (`app/mqtt/consumer.py`) | Subscribes `sensors/+/+`, parses, writes DB, broadcasts WS | Must run as `asyncio.create_task()` in lifespan — NOT `BackgroundTask`; DB writes via `asyncio.to_thread()` |
-| **WebSocket endpoint** (`GET /api/v1/iot/ws/{device_id}`) | Pushes live readings to IoT Monitoring page | Message format: `{device_id, metric, value, ts}` — `ts` must be Unix ms to match chart contract `{ ts: number, value: number }` |
-| **Historical REST endpoint** (`GET /api/v1/iot/readings/{device_id}`) | Returns time-windowed readings for chart backfill on load | Supports query params `metric` + `window` (1h/6h/24h/7d); returns `[{ts, value}]` |
-| **Frontend WebSocket hook** (`useIotWebSocket`) | Replaces `generateReadings()` mock in `iot/page.tsx` | Exponential backoff reconnect; StrictMode cleanup; REST backfill on window change |
+| **Alembic migration 0003** | `ai_recommendations` table: `id`, `asset_id` FK, `metric`, `risk_score`, `recommendation_text`, `status` (`pending`/`approved`/`rejected`), `created_at`, `reviewed_by`, `reviewed_at` | `down_revision = "0002"`; `status` is a PostgreSQL enum; add index on `(asset_id, status)` |
+| **Random Forest trainer** (`app/ai/trainer.py`) | Queries `sensor_readings` (last 7 days), engineers features per asset (mean, max, std per metric), fits `RandomForestClassifier`, persists to `app/models/rf_model.joblib` | Must handle cold-start (< N samples) gracefully — return `{"detail": "insufficient_data"}` rather than crash |
+| **Inference service** (`app/ai/predictor.py`) | Loads `rf_model.joblib` at startup; `predict(asset_features) → risk_score + recommendation` | CPU-bound; must run via `asyncio.to_thread()` — never called directly in an async route handler |
+| **`POST /api/v1/ai/recommendations`** | Triggers inference for an asset, writes `ai_recommendations` row with `status=pending` | Requires `Manager` or `Admin` role; returns created recommendation |
+| **`GET /api/v1/ai/recommendations`** | Returns paginated recommendations list; supports `?status=pending&asset_id=X` filters | No role restriction on reads; frontend AI page uses this on load |
+| **`PATCH /api/v1/ai/recommendations/{id}/approve`** | Sets `status=approved`, records `reviewed_by` + `reviewed_at` | Manager/Admin only; triggers a `notification` row insert (so notification bell updates) |
+| **`PATCH /api/v1/ai/recommendations/{id}/reject`** | Sets `status=rejected`, records reviewer | Manager/Admin only |
+| **AI Predictive page wired** | `/dashboard/ai` replaces static mock array with `GET /api/v1/ai/recommendations` fetch | Zero UI redesign — existing risk card components consume new API response shape |
 
-### Sensor Metrics (must match SENSOR_CONFIG exactly)
+### Must Build — SSE Notification Delivery Pillar
 
-| Metric Key | Unit | Categories |
-|------------|------|-----------|
-| `temperature` | °C | All |
-| `humidity` | % | Laptop, Printer, Office Equipment |
-| `power` | W | All |
-| `current` | A | All |
-| `vibration` | mm/s | Printer, Forklift |
-| `running_hours` | h | All (monotonically increasing) |
+| Feature | What It Does | Key Constraint |
+|---------|-------------|----------------|
+| **Alembic migration 0003** (same) | `notifications` table: `id`, `user_id` FK, `type` (enum: `threshold_breach`/`ai_recommendation`/`assignment`/`maintenance`), `title`, `message`, `is_read`, `created_at` | Index on `(user_id, is_read, created_at DESC)` — primary query pattern |
+| **SSE endpoint** (`GET /api/v1/notifications/stream`) | Long-lived SSE stream; pushes new notifications to the authenticated user in real time | `sse-starlette` `EventSourceResponse`; must handle client disconnect cleanly; auth via `?token=` query param or `Authorization` header (EventSource does not support custom headers in browsers) |
+| **SSE ConnectionManager** (`app/services/sse_manager.py`) | Tracks `user_id → asyncio.Queue`; `push(user_id, event)` enqueues; SSE generator dequeues | One `asyncio.Queue` per connected user; `asyncio.Lock` on the connections dict; cleanup on generator exit |
+| **`GET /api/v1/notifications`** | Returns paginated notification history for the current user | Supports `?unread_only=true`; returns `[{id, type, title, message, is_read, created_at}]` |
+| **`PATCH /api/v1/notifications/{id}/read`** | Marks a notification as read | Staff can only read own notifications; Admin can read all |
+| **`PATCH /api/v1/notifications/read-all`** | Bulk mark-as-read for current user | Scoped to `user_id` — no cross-user access |
+| **Notification bell badge wired** | Bell badge reads unread count from `GET /api/v1/notifications?unread_only=true&count=true` on load; SSE stream increments count in real-time | Existing bell component in layout header; count is already rendered from mock state |
+| **Notifications page wired** | `/dashboard/notifications` replaces mock list with real API fetch + mark-read actions | Zero UI redesign |
 
-### Defer to v2.2
+### Deferred from v2.1 — Now In Scope for v2.2
 
-- Server-side threshold evaluation + alert events (pairs with notification pipeline)
-- Sensor online/offline status tracking
-- MQTT TLS/authentication (internal Docker network only for v2.1)
-- Time-series database (PostgreSQL handles 7-day window at 5M rows fine)
-- ML anomaly detection (v2.2 predictive maintenance milestone)
+| Feature | Why Now (was deferred) |
+|---------|----------------------|
+| **Threshold breach alerting** | MQTT consumer already detects metric values; v2.2 adds `notifications` table to persist breach events and SSE to deliver them | 
+| **Sensor online/offline status** | Can be detected by last-seen timestamp in `sensor_readings`; surface in AI recommendations as a risk factor |
+
+### Defer to v2.3+
+
+| Feature | Why Defer |
+|---------|-----------|
+| MQTT TLS / auth | Internal Docker network only; no production deployment in scope |
+| Model retraining schedule (cron/APScheduler) | Manual `POST /ai/train` endpoint is sufficient for demo; auto-retraining adds operational complexity |
+| Per-user notification preferences | Nice-to-have; all notification types delivered to all users for now |
+| Email / SMS notification delivery | External integrations; in-app SSE is the v2.2 scope |
+| Multi-model comparison / A-B testing | Single RF model; no experimentation infrastructure needed |
 
 ---
 
 ## Architecture Overview
 
-### 6-Phase Build Order
-
-```
-Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6
-Migration  Mosquitto  WebSocket  Consumer  Simulator  Frontend
-```
-
-| Phase | Deliverable | Key Files | Why This Order |
-|-------|------------|-----------|----------------|
-| **1 — DB Migration** | `sensor_readings` table in PostgreSQL | `alembic/versions/0002_sensor_readings.py` | Everything else writes to or reads from this table; must exist first |
-| **2 — Mosquitto** | Broker service + config file | `docker-compose.yml`, `mosquitto/config/mosquitto.conf` | Consumer and simulator both depend on a running broker |
-| **3 — WebSocket** | `ConnectionManager` + WS endpoint | `app/services/websocket_manager.py`, `app/routers/iot.py` | Consumer imports the manager module; must exist before consumer compiles |
-| **4 — MQTT Consumer** | aiomqtt subscriber wired into lifespan | `app/mqtt/consumer.py`, `app/main.py` (lifespan edit) | Depends on Phase 1 (DB), Phase 2 (broker), Phase 3 (WS manager) |
-| **5 — Simulator** | Python script publishing synthetic data | `scripts/sensor_simulator.py` | Can only be tested meaningfully once broker + consumer + DB are live |
-| **6 — Frontend Wiring** | Replace mock with WS + REST hook | `frontend/app/dashboard/iot/page.tsx`, `frontend/lib/api.ts` | Terminal dependency; validates the entire pipeline end-to-end |
-
-### Component Boundaries
+### v2.2 Component Boundaries
 
 ```
 backend/
   app/
-    mqtt/
-      consumer.py          ← aiomqtt subscriber + DB + broadcast orchestration
+    ai/
+      trainer.py           ← Feature engineering from sensor_readings + RF training; writes rf_model.joblib
+      predictor.py         ← Loads rf_model.joblib at startup; predict() via asyncio.to_thread()
     services/
-      websocket_manager.py ← ConnectionManager (set + asyncio.Lock, per-device channels)
+      sse_manager.py       ← SSEConnectionManager (user_id → asyncio.Queue; push; cleanup on disconnect)
+      notification_svc.py  ← NotificationService.create(user_id, type, title, msg) → DB insert + SSE push
     models/
-      sensor_reading.py    ← SQLAlchemy ORM model
+      ai_recommendation.py ← SQLAlchemy ORM; status Enum; FK to assets
+      notification.py      ← SQLAlchemy ORM; type Enum; FK to users; is_read bool
     schemas/
-      sensor_reading.py    ← Pydantic SensorReadingOut, SensorReadingWsEvent
+      ai_recommendation.py ← Pydantic: AiRecommendationCreate, AiRecommendationOut, ApprovalRequest
+      notification.py      ← Pydantic: NotificationOut, NotificationEvent (for SSE)
     routers/
-      iot.py               ← /ws/{device_id} WebSocket + /readings/{device_id} REST
-  main.py                  ← lifespan: asyncio.create_task(start_mqtt_consumer())
-  config.py                ← MQTT_HOST, MQTT_PORT, MQTT_TOPIC_PREFIX settings
+      ai.py                ← POST /recommendations, GET /recommendations, PATCH /{id}/approve, /{id}/reject
+      notifications.py     ← GET /stream (SSE), GET /, PATCH /{id}/read, PATCH /read-all
+    mqtt/
+      consumer.py          ← EXISTING; add threshold_breach detection → NotificationService.create()
+    main.py                ← lifespan: load predictor model at startup
 
-scripts/
-  sensor_simulator.py      ← standalone script; paho-mqtt publish loop; reads DB for device list
-
-mosquitto/
-  config/mosquitto.conf    ← listener 1883; allow_anonymous true
+  models/
+    rf_model.joblib        ← Trained RF artifact; loaded once at startup; NOT committed to git
 
 alembic/versions/
-  0002_sensor_readings.py  ← sensor_readings table + 3 indexes
+  0003_ai_notifications.py ← ai_recommendations + notifications tables + all indexes
 ```
 
-### WebSocket Message Contract
+### Key Architectural Decisions
 
-**Endpoint:** `GET /api/v1/iot/ws/{device_id}` (use `"*"` for global / all devices)
+| Decision | Rationale |
+|----------|-----------|
+| **File-based model artifact** (`joblib`) | Simplest persistence for a demo-scale single-model system; avoids MLflow/model-registry overhead |
+| **`asyncio.to_thread()` for inference** | RF `predict()` is CPU-bound; calling it in an async route handler blocks the event loop for all other requests |
+| **`asyncio.Queue` per SSE user** (not global broadcast) | Notifications are per-user; a per-user queue eliminates filtering on broadcast and avoids leaking one user's notifications to another |
+| **`sse-starlette`** | `EventSourceResponse` + generator protocol handles reconnect IDs and Last-Event-ID; eliminates manual SSE framing bugs |
+| **SSE auth via `?token=` query param** | Browser `EventSource` API does not support custom headers; JWT token in query param is the standard workaround |
+| **Notification creation in `NotificationService`** | Centralises the `DB insert → SSE push` two-step; called from MQTT consumer (threshold breaches), AI router (new recommendation), and assignment/maintenance routers (workflow events) |
+| **Separate `0003` migration for both tables** | Both tables are introduced together in v2.2; a single migration is atomic |
 
-**Message format** (each incoming sensor reading):
-```json
-{
-  "device_id": "DEV-001",
-  "metric": "temperature",
-  "value": 47.3,
-  "ts": 1751724151000
-}
+### Data Flow — AI Inference Path
+
+```
+Manager clicks "Run Analysis" on /dashboard/ai
+  → POST /api/v1/ai/recommendations  {asset_id: "..."}
+  → Route calls asyncio.to_thread(predictor.predict, asset_features)
+  → predictor queries sensor_readings (last 7d for asset), builds feature vector
+  → RF model returns risk_score + recommendation_text
+  → Route inserts ai_recommendations row (status=pending)
+  → NotificationService.create(manager_id, "ai_recommendation", ...)
+  → SSE push to all Manager/Admin connections
+  → Response: {id, asset_id, risk_score, recommendation_text, status: "pending"}
 ```
 
-`ts` is Unix **milliseconds** — matches the frontend chart type `{ ts: number, value: number }` directly. No frontend transformation required.
+### Data Flow — SSE Notification Path
+
+```
+Any event (threshold breach / AI recommendation / approval)
+  → NotificationService.create(user_id, type, title, message)
+  → INSERT INTO notifications (...)
+  → sse_manager.push(user_id, NotificationEvent)
+  → asyncio.Queue for that user_id receives item
+  → SSE generator for that user dequeues + yields "data: {...}\n\n"
+  → Browser EventSource fires onmessage
+  → Frontend increments bell badge count; if /dashboard/notifications is open, prepends row
+```
+
+### Data Flow — Threshold Breach Path (from v2.1 MQTT consumer)
+
+```
+MQTT consumer receives sensor reading
+  → asyncio.to_thread(_write_to_db, payload)   [existing]
+  → After DB write: check value against SENSOR_CONFIG thresholds
+  → If value > critical threshold:
+      NotificationService.create(all_managers, "threshold_breach", asset_id, metric, value)
+  → SSE push triggers for all connected Manager/Admin users
+```
 
 ---
 
 ## Critical Warnings
 
-### ⛔ WARNING 1 — Sync SQLAlchemy Inside Async MQTT Consumer Blocks the Event Loop
+### ⛔ WARNING 1 — RF Inference is CPU-Bound: Blocks Event Loop if Called Directly
 
-**Pitfall refs:** MQTT-1 (event loop blocking), MQTT-3 (connection pool exhaustion)
+**What breaks:** `model.predict(features)` runs in Python (no I/O to yield on). Called directly inside an `async def` route, it blocks the entire event loop — all WebSocket pushes, SSE streams, and HTTP requests pause for the inference duration. At 50 assets × 7-day feature windows this can take 100–500ms.
 
-**What breaks:** Calling `SessionLocal()` + `db.commit()` directly inside `async for message` blocks the entire event loop — every WebSocket push and HTTP request queues behind each DB write. At 10 sensors × 5 readings/s the effect is immediate WebSocket stutter.
-
-**Mandatory prevention pattern:**
+**Mandatory pattern:**
 ```python
-# Async consumer handler — DB write offloaded to thread pool:
-await asyncio.to_thread(_write_to_db, device_id, metric, value, unit)
+# WRONG — blocks event loop:
+@router.post("/ai/recommendations")
+async def create_recommendation(req: RecommendationRequest, db: Session = Depends(get_db)):
+    result = predictor.predict(req.asset_id, db)   # BLOCKS
+    ...
 
-def _write_to_db(device_id, metric, value, unit):   # sync — runs in thread
-    db = SessionLocal()
-    try:
-        db.add(SensorReading(device_id=device_id, metric=metric, value=value, unit=unit))
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()   # always close — never rely on GC
+# CORRECT — offload to thread pool:
+@router.post("/ai/recommendations")
+async def create_recommendation(req: RecommendationRequest, db: Session = Depends(get_db)):
+    result = await asyncio.to_thread(predictor.predict, req.asset_id, db)
+    ...
 ```
-
-`broadcast()` must be called from async context **after** `to_thread` returns — calling an `async` method from inside the sync thread raises `RuntimeError: no running event loop`.
 
 ---
 
-### ⛔ WARNING 2 — Mosquitto 2.x Silent Connection Refusal Without Explicit Config
+### ⛔ WARNING 2 — SSE Client Disconnect Must Clean Up asyncio.Queue
 
-**Pitfall ref:** INFRA-1
+**What breaks:** When a browser tab closes or navigates away, the SSE `EventSourceResponse` generator raises `GeneratorExit`. If the `asyncio.Queue` for that user is not removed from `SSEConnectionManager`, the queue grows indefinitely (events enqueued, never consumed). Memory leak proportional to events × disconnected users.
 
-**What breaks:** Mosquitto 2.0 changed defaults — `allow_anonymous` is `false` and no default listener is configured. Starting without a config file causes the broker to start but silently reject all MQTT connections. No error is visible on the client side; publishes and subscribes appear to succeed but data is dropped entirely.
-
-**Mandatory `mosquitto/config/mosquitto.conf`:**
-```ini
-listener 1883
-allow_anonymous true
-
-persistence true
-persistence_location /mosquitto/data/
-
-log_dest file /mosquitto/log/mosquitto.log
-log_type error
-log_type warning
-log_type notice
-log_type information
-```
-
-**Verification:** After `docker compose up`, run `docker logs mosquitto` — confirm `Opening ipv4 listen socket on port 1883`.
-
----
-
-### ⛔ WARNING 3 — MQTT Consumer Must Be `asyncio.create_task()` in Lifespan, Not `BackgroundTask`
-
-**Pitfall ref:** MQTT-2
-
-**What breaks:** `BackgroundTasks.add_task()` is per-request — it exits after the HTTP response. Starting the MQTT consumer this way causes it to silently exit after 30–60 seconds, dropping all subsequent sensor readings with zero error logs.
-
-**Mandatory lifespan pattern:**
+**Mandatory pattern:**
 ```python
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    mqtt_task = asyncio.create_task(start_mqtt_consumer())  # ← create_task, NOT BackgroundTask
-    yield
-    mqtt_task.cancel()
+async def event_generator(user_id: str):
+    queue: asyncio.Queue = await sse_manager.connect(user_id)
     try:
-        await mqtt_task
-    except asyncio.CancelledError:
-        pass
-```
-
-Also: inside the consumer's `while True` reconnect loop, catch `asyncio.CancelledError` and **re-raise** it — a bare `except Exception` swallows cancellation and hangs `docker compose stop` for 5+ seconds.
-
----
-
-### ⚠ WARNING 4 — ConnectionManager Must Use `set` + `asyncio.Lock`
-
-**Pitfall refs:** WS-1 (dead connection silences broadcast), WS-2 (race on concurrent connect/disconnect)
-
-- **List-based broadcast** raises on the first dead connection and stops delivery to all subsequent clients.
-- **No lock** causes intermittent `ValueError: list.remove(x): x not in list` under connection churn.
-
-**Required pattern:** `dict[str, set[WebSocket]]` channels + `asyncio.Lock`; broadcast iterates a snapshot copy outside the lock; send failures are collected and removed in a second lock acquire.
-
----
-
-### ⚠ WARNING 5 — React StrictMode Double-Mounts WebSocket in Development
-
-**Pitfall ref:** WS-5
-
-Next.js 15 / React 18 StrictMode double-invokes `useEffect` in dev — a WebSocket opened without a cleanup function creates two connections per tab, duplicate chart updates, and zombie server connections.
-
-**Mandatory cleanup:**
-```tsx
-useEffect(() => {
-  const ws = new WebSocket(url);
-  ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
-  return () => ws.close();   // ← required
-}, []);
+        while True:
+            event = await queue.get()
+            yield {"data": event.json(), "event": event.type}
+    except GeneratorExit:
+        await sse_manager.disconnect(user_id)   # removes queue from registry
 ```
 
 ---
 
-## Data Flow
+### ⛔ WARNING 3 — Model Cold Start: sensor_readings May Be Empty at First Inference
 
-```
-Simulator      Publishes JSON {value, ts} every 5s per metric to topic sensors/{device_id}/{metric}
-      ↓
-Mosquitto      Routes TCP message to subscribed consumer (internal Docker network, port 1883)
-      ↓
-MQTT Consumer  Parses topic → extracts device_id + metric; parses payload → extracts value + ts
-      ↓
-asyncio.thread Sync SQLAlchemy INSERT into sensor_readings (device_id, metric, value, recorded_at)
-      ↓
-PostgreSQL     Stores reading; indexed on (device_id, metric) and (recorded_at DESC) for queries
-      ↓
-broadcast()    ConnectionManager sends {device_id, metric, value, ts} to all subscribed WS clients
-      ↓
-WebSocket      FastAPI pushes JSON text frame to each connected Next.js client (per-device + global)
-      ↓
-Frontend hook  useIotWebSocket receives message, updates per-metric chart state [{ts, value}]
-      ↓
-Recharts       Re-renders line chart with new data point; mock generateReadings() fully replaced
+**What breaks:** On a fresh database (or after a DB wipe), `sensor_readings` has 0 rows. The feature engineering step returns an empty DataFrame; `model.predict([])` raises `ValueError`. The API crashes with a 500 instead of a meaningful response.
+
+**Mandatory handling:**
+```python
+def predict(asset_id: str, db: Session) -> PredictionResult:
+    readings = _fetch_feature_rows(asset_id, db)
+    if len(readings) < MIN_SAMPLES:       # e.g., MIN_SAMPLES = 10
+        return PredictionResult(
+            risk_score=None,
+            recommendation_text=None,
+            status="insufficient_data",
+        )
+    features = _engineer_features(readings)
+    score = model.predict_proba(features)[0][1]
+    ...
 ```
 
 ---
 
-## Confidence Assessment
+### ⚠ WARNING 4 — Manager Approval Gate Must Be Enforced Server-Side
 
-| Area | Confidence | Basis |
-|------|------------|-------|
-| Stack (aiomqtt, Mosquitto) | **HIGH** | Live PyPI + Docker Hub API queries on 2026-07-05; version constraints verified |
-| Features (6 metrics, contract) | **HIGH** | Direct codebase inspection of `SENSOR_CONFIG` + frontend types |
-| Architecture (patterns, files) | **HIGH** | Standard FastAPI idioms; sync/async boundary is a solved problem with `asyncio.to_thread` |
-| Pitfalls (critical 3) | **HIGH** | Each pitfall verified against the actual v2.0 codebase baseline |
-| Frontend wiring | **MEDIUM** | Hook pattern is clear; exact state update locations in `iot/page.tsx` need inspection in Phase 6 |
-| Retention / pruning | **MEDIUM** | Row volume estimate is arithmetic; pruning strategy deferred to v2.2 per FEATURES.md |
+**What breaks:** The `PATCH /ai/recommendations/{id}/approve` endpoint must verify the caller has `Manager` or `Admin` role. If it relies on frontend-only role hiding (e.g., hiding the "Approve" button for Staff), any authenticated user can call the API directly and approve recommendations.
 
-**No unresolved gaps.** All critical decisions are grounded in codebase inspection and verified API research.
+**Mandatory pattern:** Use the existing `require_role(["Manager", "Admin"])` FastAPI dependency already established in v2.0 — do not add new role-checking logic; reuse the existing pattern.
+
+---
+
+### ⚠ WARNING 5 — SSE Auth: EventSource Cannot Send Authorization Headers
+
+**What breaks:** The browser's native `EventSource` API does not support custom request headers (including `Authorization: Bearer <token>`). Sending the JWT in the standard header silently fails — the SSE connection opens unauthenticated, triggering a 401 or returning empty events.
+
+**Mandatory pattern:** Accept the JWT via `?token=` query parameter for the SSE endpoint only:
+```python
+@router.get("/notifications/stream")
+async def notification_stream(token: str = Query(...), ...):
+    user = verify_jwt_token(token)   # same logic as get_current_user but reads from query param
+    ...
+```
+Document this as the intentional SSE auth pattern — not a security shortcut.
+
+---
+
+### ⚠ WARNING 6 — v2.1 PITFALLS Still Apply (Inherited Baseline)
+
+All five CRITICAL pitfalls from PITFALLS.md remain active in v2.2 because the MQTT consumer, WebSocket manager, and sync SQLAlchemy stack are unchanged:
+- **MQTT-1**: Sync SQLAlchemy must still use `asyncio.to_thread()` in MQTT handler — adding threshold-check logic after the DB write must stay in async context
+- **WS-1/WS-2**: ConnectionManager race conditions apply equally to SSEConnectionManager; use `asyncio.Lock` + `set`
+- **DOCKER-1/DOCKER-2**: Mosquitto config and healthcheck requirements are unchanged
 
 ---
 
@@ -289,39 +279,78 @@ Recharts       Re-renders line chart with new data point; mock generateReadings(
 
 ### Recommended Phase Sequence
 
-Hard dependency ordering — nothing can be built out of sequence:
+The two pillars (AI + SSE notifications) share the same migration and the same `NotificationService` — they must be built together, not as independent parallel tracks.
 
-| Phase | Name | Rationale |
-|-------|------|-----------|
-| 1 | **DB Migration** | `sensor_readings` table must exist before any inserts |
-| 2 | **Mosquitto + Docker Compose** | Broker must be up before consumer or simulator can connect |
-| 3 | **WebSocket + ConnectionManager** | Consumer imports the manager at module level; must exist before consumer runs |
-| 4 | **MQTT Consumer + Lifespan** | Integration core; depends on Phase 1 (DB), 2 (broker), 3 (WS manager) |
-| 5 | **Sensor Simulator** | Testable only once broker + consumer + DB are live together |
-| 6 | **Frontend Wiring** | Terminal node; validates the entire pipeline end-to-end |
+| Phase | Name | Rationale | Delivers |
+|-------|------|-----------|----------|
+| **1** | **DB Migration 0003** | `ai_recommendations` + `notifications` tables; everything else writes to them | Schema foundation for both pillars |
+| **2** | **NotificationService + SSEManager** | Shared service used by AI router, MQTT consumer, and notification router; build once before consumers exist | Core notification infrastructure |
+| **3** | **SSE Endpoint + Notification REST** | SSE stream + CRUD endpoints; can be built and tested with manual `NotificationService.create()` calls before AI exists | Notification bell + Notifications page unblocked |
+| **4** | **Notifications page + bell badge wired** | Frontend connects to Phase 3 API; independent of AI pillar | Notifications page fully live |
+| **5** | **RF Trainer + Predictor service** | ML pipeline: feature engineering, model fit, joblib persistence, predictor load at startup | AI inference capability |
+| **6** | **AI Recommendations REST API** | POST/GET/PATCH endpoints; inference trigger; approval gate; calls NotificationService on events | AI API fully functional |
+| **7** | **AI Predictive page wired** | `/dashboard/ai` reads from Phase 6 API; replaces mock array | AI page fully live |
+| **8** | **MQTT Threshold Breach → Notifications** | Extend existing MQTT consumer to call `NotificationService.create()` on threshold crossings | Threshold alerts delivered to bell + SSE |
+
+### Phase Ordering Rationale
+
+- **Migration first**: Both `ai_recommendations` and `notifications` tables needed before any API phase
+- **NotificationService before SSE endpoint**: The SSE generator depends on `SSEConnectionManager.push()` — both must be in the same module; build together
+- **SSE before AI**: Notification delivery can be validated with manually created notification rows before the AI inference pipeline exists; keeps phases independently shippable
+- **Trainer before API**: `predictor.py` must load a model file; the file must exist (trained) before the API can be tested end-to-end
+- **MQTT threshold extension last**: Non-blocking addition to existing consumer; safe to defer until both pillars are independently verified
 
 ### Research Flags
 
-| Phase | Needs `/gsd-plan-phase --research`? | Reason |
-|-------|-------------------------------------|--------|
-| Phase 1 (migration) | ❌ No | Schema fully specified in ARCHITECTURE.md |
-| Phase 2 (Mosquitto) | ❌ No | `docker-compose.yml` + `mosquitto.conf` content fully specified in STACK.md |
-| Phase 3 (WebSocket) | ❌ No | `ConnectionManager` pattern fully specified with code in ARCHITECTURE.md + PITFALLS.md |
-| Phase 4 (consumer) | ❌ No | Consumer code fully specified in ARCHITECTURE.md; critical patterns in PITFALLS.md |
-| Phase 5 (simulator) | ❌ No | Metric list, intervals, topic format fully specified in FEATURES.md |
-| Phase 6 (frontend) | ⚠️ Inspect | Exact mock replacement points in `iot/page.tsx` and `useStore()` calls need review |
+| Phase | Needs `--research-phase`? | Reason |
+|-------|--------------------------|--------|
+| 1 (migration) | ❌ No | Schema fully specified above |
+| 2 (NotificationService) | ❌ No | `asyncio.Queue` + Lock pattern is standard; specified in warnings |
+| 3 (SSE endpoint) | ⚠️ Inspect | Verify `sse-starlette` 2.x API (EventSourceResponse generator protocol may have changed) |
+| 4 (frontend notifications) | ❌ No | Existing page structure; standard `useEffect` EventSource hook |
+| 5 (RF trainer) | ❌ No | sklearn RandomForestClassifier API is stable; feature engineering from sensor_readings is straightforward |
+| 6 (AI REST API) | ❌ No | Standard FastAPI CRUD + state machine; approval gate reuses existing `require_role` dep |
+| 7 (AI frontend) | ❌ No | Existing page; connect to API; no new UI components |
+| 8 (MQTT threshold) | ❌ No | Additive change to existing consumer; pattern already documented |
 
 ### Effort Estimate
 
 | Phase | Est. Days |
 |-------|-----------|
-| 1 — Migration | 0.5 |
-| 2 — Mosquitto | 0.5 |
-| 3 — WebSocket | 1.0 |
-| 4 — MQTT Consumer | 1.5 |
-| 5 — Simulator | 1.0 |
-| 6 — Frontend | 1.5 |
-| **Total** | **6.0 days** |
+| 1 — Migration 0003 | 0.5 |
+| 2 — NotificationService + SSEManager | 1.0 |
+| 3 — SSE Endpoint + Notification REST | 1.0 |
+| 4 — Frontend: Notifications page + bell | 1.0 |
+| 5 — RF Trainer + Predictor | 1.5 |
+| 6 — AI REST API | 1.5 |
+| 7 — Frontend: AI page wired | 1.0 |
+| 8 — MQTT Threshold Breach Notifications | 0.5 |
+| **Total** | **8.0 days** |
+
+---
+
+## Confidence Assessment
+
+| Area | Confidence | Basis |
+|------|------------|-------|
+| Stack (sklearn, sse-starlette, pandas) | **HIGH** | All packages are well-established; versions verified via PyPI; no exotic dependencies |
+| Features (AI pillar) | **HIGH** | PROJECT.md specification is precise; frontend AI page structure already built in v1.3 |
+| Features (SSE pillar) | **HIGH** | PROJECT.md specification is precise; notification page structure already built in v1.3 |
+| Architecture (patterns) | **HIGH** | All patterns (asyncio.to_thread, asyncio.Queue SSE, joblib persistence) are standard FastAPI/sklearn idioms |
+| Pitfalls | **HIGH** | v2.1 PITFALLS.md is thorough for the shared baseline; v2.2-specific pitfalls (warnings 1–5) are derived from the same sync/async analysis |
+| Frontend wiring | **MEDIUM** | Exact prop shapes for AI risk cards and notification rows require inspection of `ai/page.tsx` and `notifications/page.tsx` before Phase 7/4 |
+
+**Overall confidence:** HIGH
+
+### Gaps to Address
+
+| Gap | Impact | How to Handle |
+|-----|--------|---------------|
+| **ARCHITECTURE.md not produced** | Medium — no file-level architecture map exists | Use architecture section above as the authoritative spec; inspect codebase at Phase 2 start |
+| **Frontend API contract for AI page** | Medium — `ai/page.tsx` mock shape may differ from API response | Inspect `frontend/app/dashboard/ai/page.tsx` before Phase 7 (or at Phase 6 design) to align `AiRecommendationOut` Pydantic schema to existing component props |
+| **Frontend API contract for Notifications** | Low — notification shape is simpler and more standard | Inspect `notifications/page.tsx` before Phase 3 to confirm `{id, type, title, message, is_read, created_at}` matches component props |
+| **Training data schema mapping** | Low — `sensor_readings` schema is confirmed from v2.1 | Feature engineering logic (mean/max/std per metric per asset over 7d) is straightforward given the schema |
+| **SSE auth token approach** | Low — `?token=` query param is standard for SSE | Verify `verify_jwt_token()` function in existing auth module accepts token from query param, or add thin wrapper |
 
 ---
 
@@ -329,15 +358,16 @@ Hard dependency ordering — nothing can be built out of sequence:
 
 | Source | Confidence | Used In |
 |--------|------------|---------|
-| PyPI aiomqtt 2.5.1 live API (2026-07-05) | HIGH | STACK.md |
-| PyPI paho-mqtt 2.1.0 live API (2026-07-05) | HIGH | STACK.md |
-| Docker Hub eclipse-mosquitto 2.0.22 (2026-07-05) | HIGH | STACK.md |
-| FastAPI 0.115.5 starlette dep verification | HIGH | STACK.md |
-| `frontend/app/dashboard/iot/page.tsx` (direct inspection) | HIGH | FEATURES.md, ARCHITECTURE.md |
-| `backend/app/models/asset.py` (direct inspection) | HIGH | FEATURES.md |
-| `backend/requirements.txt` (direct inspection) | HIGH | STACK.md, PITFALLS.md |
-| `backend/database.py` (direct inspection) | HIGH | PITFALLS.md — sync baseline confirmed |
-| `docker-compose.yml` (direct inspection) | HIGH | STACK.md |
-| `alembic/versions/0001_initial.py` (direct inspection) | HIGH | FEATURES.md |
-| `.planning/PROJECT.md` | HIGH | Executive Summary, scope boundaries |
-| FastAPI WebSocket + lifespan official docs | HIGH | ARCHITECTURE.md patterns |
+| `.planning/PROJECT.md` v2.2 milestone spec | HIGH | All sections — authoritative feature scope |
+| `.planning/research/STACK.md` (v2.1 baseline) | HIGH | Stack additions section — dependency constraints |
+| `.planning/research/FEATURES.md` (v2.1 baseline) | HIGH | Feature scope — deferred items now in scope |
+| `.planning/research/PITFALLS.md` (v2.1 baseline) | HIGH | Critical warnings section — all v2.1 pitfalls remain active |
+| PyPI scikit-learn, sse-starlette, pandas (standard packages) | HIGH | Stack additions |
+| FastAPI official docs — SSE with `sse-starlette` | HIGH | Architecture + SSE warnings |
+| sklearn RandomForestClassifier docs | HIGH | Architecture — AI inference path |
+| `.planning/STATE.md` (v2.2 milestone start) | HIGH | Roadmap context |
+| v1.3 frontend codebase (ai/page.tsx, notifications/page.tsx) | MEDIUM | Feature scope — frontend contract shapes (not directly inspected; flagged as gap) |
+
+---
+*Research completed: 2026-07-05*  
+*Ready for roadmap: yes*

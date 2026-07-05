@@ -32,312 +32,356 @@ This milestone adds two independent feature tracks: **AI Predictive Maintenance*
 
 ---
 
-## Differentiators (Nice to Have)
+## Feature Track A: AI Predictive Maintenance
 
-Features that improve the product but are not required for v2.1 to be functional.
+### Table Stakes — AI
 
-| Feature | Value Proposition | Complexity | Defer To |
-|---------|-------------------|------------|----------|
-| Server-side threshold evaluation + alert events | FastAPI detects critical/warning crossings; writes to `alerts` table; decouples alert logic from frontend | Medium | v2.2 (pairs with notification pipeline) |
-| Per-asset WebSocket subscriptions (`/ws/iot?asset_id=X`) | Reduces message volume for single-asset dashboard views | Low–Medium | v2.1 optional — implement only if global broadcast shows UI lag |
-| MQTT QoS 1 (at-least-once delivery) | Guarantees readings survive broker restart | Low | v2.1 optional — configure in simulator and consumer publish calls |
-| Simulator hot-reload from DB | Simulator fetches live asset list on startup; no hardcoded list | Low | v2.1 optional (seed.py already populates assets with sensor_device_id) |
-| Sensor online/offline status tracking | Track last-seen timestamp per device; mark device offline if no reading in N seconds | Low | v2.2 |
+Features that must exist for the AI track to function. Missing any one = the AI page stays on mock data.
 
----
+| Feature | Why Required | Complexity | Existing Hook |
+|---------|--------------|------------|---------------|
+| Alembic migration: `ai_recommendations` table | Stores model output persistently | LOW | New migration `0003_ai_recommendations.py` |
+| Offline batch training script (`scripts/train_model.py`) | Produces `model.pkl` artifact from `sensor_readings`; no artifact = no inference | MEDIUM | Reads `sensor_readings` via SQLAlchemy sync session |
+| Inference endpoint `POST /api/v1/ai/recommendations/infer/{asset_id}` | Triggers per-asset prediction; loads model artifact; writes row to `ai_recommendations` | MEDIUM | Loads persisted `model.pkl`; uses `sensor_readings` for feature extraction |
+| `GET /api/v1/ai/recommendations` (paginated) | Frontend AI page lists all recommendations | LOW | Standard paginated query with optional `status` filter |
+| `GET /api/v1/ai/recommendations/{id}` | Detail view for approval dialog | LOW | Single row fetch with joined asset name |
+| Manager approval gate: `PATCH /api/v1/ai/recommendations/{id}/approve` | Managers/Admins approve; sets `approved_by` + `approved_at` | LOW | `require_role(["manager", "admin"])` dependency already exists |
+| Manager reject gate: `PATCH /api/v1/ai/recommendations/{id}/reject` | Managers/Admins reject; sets `rejected_by` + `rejected_at` | LOW | Same RBAC dependency |
+| Frontend AI page wired to real API | Replace `buildRecommendations(assets)` mock with `GET /api/v1/ai/recommendations` | MEDIUM | `ai/page.tsx` already has approve/defer handlers; swap data source only |
 
-## Anti-Features (Skip for v2.1)
+**User-facing behavior (what users see):**
+1. Manager opens AI Predictive page → sees list of real recommendations from DB (sorted by risk desc, confidence desc)
+2. Each row shows: asset name, risk level (High/Medium/Low), confidence score → band ("High confidence"), recommendation text
+3. Manager clicks "Approve" → confirmation dialog → PATCH endpoint → row updates to `approved` state, `approved_by` stamped
+4. Manager clicks "Defer" → reason text dialog → PATCH endpoint → row updates to `deferred` state
+5. High-risk pending items show SLA countdown (already in frontend — purely display logic, no backend needed)
 
-Features that add complexity without proportional value at this stage.
+### Differentiators — AI
 
-| Anti-Feature | Why Skip | What to Do Instead |
-|--------------|----------|--------------------|
-| MQTT TLS/authentication | Adds cert management and config complexity; Mosquitto is internal Docker network only | Anonymous localhost broker; revisit for production hardening |
-| Persistent MQTT sessions (CleanSession=False) | Not needed when consumer always runs alongside broker | Use CleanSession=True; consumer reconnects on restart |
-| Time-series database (InfluxDB, TimescaleDB) | Over-engineered for a teaching/demo system; PostgreSQL handles 7-day rolling window fine | Plain PostgreSQL with `recorded_at` index; prune old rows on schedule |
-| Data aggregation / downsampling pipeline | Adds aggregator job and separate table; no current frontend need | Store raw readings; frontend charts use raw data from rolling window |
-| MQTT retained messages | Simulator runs continuously; frontend gets live data via WS | No retained messages; cold-start reads from REST historical endpoint |
-| Multi-broker / clustering | Single Mosquitto instance sufficient for demo scale | Single broker service in Docker Compose |
-| ML anomaly detection on readings stream | v2.2 scope (AI predictive maintenance) | Tag issue for v2.2; out of scope |
-| Separate time-series microservice | Premature; all logic fits in existing FastAPI app | Single backend; iot router added to existing `app/routers/` |
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Feature engineering from rolling windows | Compute mean/std/max of last 1h and 24h per metric per asset as model features; captures trend, not just snapshot | MEDIUM | windowed aggregates via single SQL query; far better signal than raw last-value |
+| Confidence score surfaced as band | `confidence` float (0–1) maps to `ConfidenceBand` via `getConfidenceBand()` already in frontend | LOW | Backend stores raw float; frontend maps to band — existing logic reused |
+| Auto-create maintenance request on approval | When Manager approves recommendation, backend creates a `MaintenanceRequest` row with `source="ai_recommendation"` | MEDIUM | Leverages existing `MaintenanceRequest` model and service layer |
+| Infer-all batch endpoint `POST /api/v1/ai/recommendations/infer-all` | Runs inference for all active monitored assets in one call; useful for scheduled overnight refresh | LOW | Loop over assets with `sensor_device_id IS NOT NULL`; call infer service per asset |
 
----
+### Anti-Features — AI
 
-## Sensor Simulator Design
+| Anti-Feature | Why Requested | Why Problematic | Better Approach |
+|--------------|---------------|-----------------|-----------------|
+| Real-time inference on every MQTT message | "AI should react instantly to sensor spikes" | Each MQTT message triggers model load + feature query + DB write at 5s intervals = 8+ inferences/sec; overwhelms DB and negates the batch advantage of Random Forest | Batch inference per-asset triggered manually (or on a schedule); MQTT threshold breach triggers a **notification**, not an inference run |
+| Multiple ML models (ensemble, LSTM) | "More models = better accuracy" | Massively increases training complexity, inference latency, dependency count, and debugging surface — none justified for a demo/teaching system | Single Random Forest with good feature engineering; ensemble is a future milestone |
+| MLflow / Airflow training pipeline | "We need experiment tracking" | Adds 2+ new infrastructure services; orthogonal to v2.2 goals | Simple `scripts/train_model.py` → `model.pkl`; add MLflow tracking in a dedicated "ML Ops" milestone later |
+| Online/incremental learning | "Model should update as new sensor data arrives" | scikit-learn Random Forest is not designed for incremental updates; requires full retrain anyway | Re-run `train_model.py` periodically; replace `model.pkl`; restart-free if loaded at inference time |
+| Natural-language explanation generation (LLM) | "AI recommendations should read like a doctor's note" | Requires LLM API integration, prompt engineering, cost, latency, and a separate governance track | Hard-coded recommendation templates per risk tier and top-contributing feature; already handles this in existing `lib/predictive.ts` |
 
-### Metrics to Simulate
-
-Match `SENSOR_CONFIG` exactly from `frontend/app/dashboard/iot/page.tsx`:
-
-| Metric Key | Unit | Category Scope | Base Value Range | Noise Model |
-|------------|------|----------------|------------------|-------------|
-| `temperature` | °C | All categories | 35–68°C | ±12% sinusoidal + random ±3% |
-| `humidity` | % | Laptop, Printer, Office Equipment | 50–65% | ±8% drift |
-| `power` | W | All categories | 30–750 W | ±10% step + noise |
-| `current` | A | All categories | 0.5–6.8 A | Proportional to power / nominal voltage |
-| `vibration` | mm/s | Printer, Forklift | 0.2–3.1 mm/s | Low-frequency oscillation |
-| `running_hours` | h | All categories | Monotonically increasing | +1/720 per publish (incremental) |
-
-**Category → metrics mapping** (must mirror `SENSOR_CATEGORY_MAP` from page.tsx):
-```
-Laptop:           temperature, humidity, power, current, running_hours
-Monitor:          temperature, power, current, running_hours
-Printer:          temperature, humidity, power, current, vibration, running_hours
-Forklift:         temperature, power, current, vibration, running_hours
-Office Equipment: temperature, humidity, power, running_hours
-```
-
-### Number of Devices
-
-- Seed script (`seed.py`) creates assets; a subset will have `sensor_device_id` populated.
-- **Target: 5–10 assets with sensor IDs** — enough to demonstrate multi-asset monitoring without overwhelming the broker.
-- Simulator iterates all assets with non-null `sensor_device_id`; no hardcoded list.
-
-### Publish Interval
-
-- **5 seconds per device** — near-real-time feel without flooding PostgreSQL.
-- At 5s × 8 devices × 5 sensors avg = 8 readings/second — easily handled by single psycopg2 insert.
-- `running_hours` publishes every 60 seconds (slower accumulator; 5s interval would add noise with no benefit).
-
-### MQTT Topic Structure
-
-```
-sensors/{device_id}/{metric_key}
-```
-
-Examples:
-```
-sensors/DEV-001/temperature   → payload: {"value": 47.3, "ts": 1751724000000}
-sensors/DEV-001/humidity      → payload: {"value": 61.2, "ts": 1751724000000}
-sensors/DEV-001/running_hours → payload: {"value": 1853.0, "ts": 1751724000000}
-```
-
-**Consumer subscribes to:** `sensors/#` (single wildcard subscription covers all devices and metrics).
-
-**Why per-metric topics over a single-topic JSON blob per device:**
-- Allows future per-metric subscriptions for selective processing (e.g., only temperature for threshold alerts)
-- Keeps payloads small — each message is one float + timestamp
-- Aligns with standard industrial MQTT convention (Sparkplug B inspired, but simpler)
-
-### Payload Format
-
-```json
-{
-  "value": 47.3,
-  "ts": 1751724000000
-}
-```
-
-`ts` is Unix milliseconds — matches frontend chart `{ ts: number, value: number }` format directly.
-
-### Simulator Startup Behavior
-
-1. Read `DATABASE_URL` from environment (same `.env` as API).
-2. Query `SELECT id, sensor_device_id, category FROM assets WHERE sensor_device_id IS NOT NULL AND status != 'retired'`.
-3. Build per-device metric list from `SENSOR_CATEGORY_MAP`.
-4. Connect to Mosquitto (`MQTT_BROKER_HOST`, default `localhost`; Docker service name: `mosquitto`).
-5. Publish loop: for each device, publish each applicable metric, sleep 5s, repeat.
-
----
-
-## WebSocket Design
-
-### Endpoint
-
-```
-GET /api/v1/ws/iot
-```
-
-**With optional asset filter:**
-```
-GET /api/v1/ws/iot?asset_id={uuid}
-```
-
-If `asset_id` provided, server only forwards readings for that asset. If omitted, all readings broadcast (useful for future summary/overview pages).
-
-### Connection Management
-
-**ConnectionManager class** (standard FastAPI WebSocket pattern):
-
-```python
-class ConnectionManager:
-    def __init__(self):
-        # asset_id → list[WebSocket]; None key = global subscribers
-        self.connections: dict[str | None, list[WebSocket]] = {}
-
-    async def connect(self, ws: WebSocket, asset_id: str | None) -> None: ...
-    async def disconnect(self, ws: WebSocket, asset_id: str | None) -> None: ...
-    async def broadcast(self, reading: dict) -> None:
-        # sends to global subscribers AND matching asset-specific subscribers
-```
-
-**Why dict keyed by asset_id:** The IoT Monitoring page shows one asset at a time. Filtering at broadcast time halves redundant network traffic. Implementation cost is minimal (dict lookup vs. iteration).
-
-### WebSocket Message Format
-
-```json
-{
-  "asset_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "device_id": "DEV-001",
-  "metric": "temperature",
-  "value": 47.3,
-  "ts": 1751724000000
-}
-```
-
-Maps directly to the frontend's `{ ts: number, value: number }` per-metric chart state — frontend only needs to extract `ts` and `value` fields.
-
-### Frontend Reconnect Logic
-
-Implement in a `useIoTWebSocket` hook:
-
-```
-Initial connect → on message: update chart state per metric
-On close/error:
-  Wait 2s  → reconnect attempt 1
-  Wait 4s  → reconnect attempt 2
-  Wait 8s  → ...
-  Cap at 30s between retries
-  Max 10 retries, then show "Connection lost" banner
-On window change (1h/6h/24h/7d):
-  WS stays open (live data continues)
-  Trigger fresh REST fetch for historical backfill
-```
-
-**Behavior on disconnect:** Chart freezes at last known values (no crash, no blank state). Resumes live on reconnect. No page reload required.
-
-### Broadcast vs Per-Asset Subscriptions
-
-**Recommendation: Global broadcast with server-side asset filtering** (not separate MQTT channels per asset).
-
-- All WebSocket clients receive only readings for their subscribed `asset_id`.
-- MQTT consumer calls `connection_manager.broadcast(reading)` for every new DB insert.
-- ConnectionManager routes internally — no per-asset MQTT subscriptions needed.
-
-This avoids N MQTT subscriptions (one per connected user) and keeps the consumer simple: one `sensors/#` subscription, one broadcast call.
-
-### Integration Point: MQTT Consumer → WebSocket Bridge
-
-```
-MQTT consumer receives message
-  → Parse topic → extract device_id + metric
-  → Parse payload → extract value + ts
-  → Lookup asset_id by device_id (in-memory cache: {device_id: asset_id})
-  → INSERT into sensor_readings (asset_id, device_id, metric, value, recorded_at)
-  → await connection_manager.broadcast({asset_id, device_id, metric, value, ts})
-```
-
-The `device_id → asset_id` cache avoids a DB query per reading. Populated once at startup. Acceptable for v2.1 — no real-time asset changes expected during IoT session.
-
----
-
-## Data Retention
-
-### Volume Estimate
-
-| Time Window | Rows per Device | Devices (est.) | Metrics (avg.) | Total Rows |
-|-------------|-----------------|----------------|----------------|------------|
-| 1 hour | 720 | 8 | 5 | ~28,800 |
-| 6 hours | 4,320 | 8 | 5 | ~172,800 |
-| 24 hours | 17,280 | 8 | 5 | ~691,200 |
-| 7 days | 120,960 | 8 | 5 | ~4,838,400 |
-
-~5 million rows over 7 days is entirely manageable for PostgreSQL with a `recorded_at` index. No time-series database needed.
-
-### Retention Policy
-
-**Keep 7 days of raw readings** — matches the frontend's maximum time window (7d selector).
-
-**Pruning strategy — simple background asyncio task in FastAPI lifespan:**
-```python
-DELETE FROM sensor_readings WHERE recorded_at < NOW() - INTERVAL '7 days'
-```
-- Run hourly (asyncio.sleep(3600) loop).
-- Run once on startup to clear any backlog from service downtime.
-- No external scheduler, no cron, no partitioning needed at this scale.
-
-### sensor_readings Table Schema
+### AI Data Model
 
 ```sql
-CREATE TABLE sensor_readings (
-    id          BIGSERIAL PRIMARY KEY,
-    asset_id    UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
-    device_id   VARCHAR(100) NOT NULL,
-    metric      VARCHAR(50) NOT NULL,
-    value       DOUBLE PRECISION NOT NULL,
-    recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE ai_recommendations (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    asset_id     UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    recommendation TEXT NOT NULL,          -- human-readable text (template-generated)
+    confidence   FLOAT NOT NULL,           -- 0.0–1.0, maps to ConfidenceBand in frontend
+    risk_level   VARCHAR(10) NOT NULL,     -- 'High' | 'Medium' | 'Low'
+    risk_score   FLOAT NOT NULL,           -- 0–100 numeric, drives sort order
+    top_factors  TEXT[],                   -- top feature names from RF feature_importances_
+    status       VARCHAR(20) NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'rejected'
+    approved_by  UUID REFERENCES users(id),
+    approved_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
--- Primary query pattern: get readings for asset+metric over a time window
-CREATE INDEX ix_sensor_readings_asset_metric_time
-    ON sensor_readings (asset_id, metric, recorded_at DESC);
-
--- Supports fast pruning DELETE WHERE recorded_at <
-CREATE INDEX ix_sensor_readings_recorded_at
-    ON sensor_readings (recorded_at DESC);
+CREATE INDEX ix_ai_recs_asset_created ON ai_recommendations(asset_id, created_at DESC);
+CREATE INDEX ix_ai_recs_status ON ai_recommendations(status);
 ```
 
-**Why BIGSERIAL not UUID:** Sensor readings are append-only, high-volume, time-ordered. Auto-increment integer is cheaper on inserts and sequential scans than UUID with random page layout.
+**Why `top_factors TEXT[]` not a join table:** Random Forest returns feature importance names as a flat array. PostgreSQL array column is simpler than a separate `recommendation_factors` table at this scale. Frontend renders them as a badge list.
 
-**Why no `unit` column:** Unit is derivable from `metric` key — redundant storage creates drift risk. Keep source of truth in API schema or a static lookup dict.
+### ML Training Design
 
-### Historical Query Pattern
+**Input features** (per asset, computed from `sensor_readings`):
+```
+For each metric in asset's sensor set:
+  - mean_1h:   AVG(value) WHERE recorded_at > NOW() - 1h
+  - std_1h:    STDDEV(value) WHERE recorded_at > NOW() - 1h
+  - max_1h:    MAX(value) WHERE recorded_at > NOW() - 1h
+  - mean_24h:  AVG(value) WHERE recorded_at > NOW() - 24h
+  - max_24h:   MAX(value) WHERE recorded_at > NOW() - 24h
+  - pct_warn:  fraction of readings exceeding warning threshold in last 24h
+  - pct_crit:  fraction of readings exceeding critical threshold in last 24h
+```
+
+**Label generation** (synthetic for demo — no historical failure events):
+```python
+# Risk score derived from threshold violations + running_hours ratio
+risk_score = (
+    0.4 * pct_crit_any_metric +
+    0.3 * pct_warn_any_metric +
+    0.2 * (running_hours / critical_threshold_running_hours) +
+    0.1 * max_temperature_ratio
+) * 100  # 0–100
+```
+
+**Why synthetic labels:** No real failure history exists. Synthetic labels from threshold violation patterns produce a realistic training signal for a demo system. Documents as "rule-based label generation" in the training script header.
+
+**Model:** `RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42)` from scikit-learn.
+
+**Artifact:** `backend/models/model.pkl` — serialized with `joblib.dump()`. Loaded once at API startup into module-level singleton; not reloaded per request.
+
+---
+
+## Feature Track B: SSE Notifications
+
+### Table Stakes — SSE
+
+Features that must exist for SSE notifications to function. Missing any one = bell stays on mock data.
+
+| Feature | Why Required | Complexity | Existing Hook |
+|---------|--------------|------------|---------------|
+| Alembic migration: `notifications` table | Persists events across page reloads and user sessions | LOW | New migration `0004_notifications.py` |
+| SSE endpoint `GET /api/v1/notifications/stream` | Server pushes events to client; browser's `EventSource` API | MEDIUM | Token-in-query-param auth (EventSource cannot send headers) |
+| SSE auth: JWT token via `?token=<jwt>` query param | `EventSource` browser API has no header support | LOW | Validate token in endpoint before streaming; same `python-jose` decode |
+| Notification creation service (internal) | Shared function `create_notification(user_id, title, body, event_type)` called from three trigger points | LOW | Pure DB insert; no HTTP call |
+| Trigger 1: MQTT threshold breach | MQTT consumer calls notif service when reading crosses critical threshold | MEDIUM | Hook into `_process_message()` in `consumer.py`; threshold constants from `SENSOR_CONFIG` |
+| Trigger 2: Maintenance status change | Maintenance router emits notification when status changes (e.g., `In Progress → Completed`) | LOW | Add notif call to maintenance update endpoint |
+| Trigger 3: Assignment events | Assignment router emits notification on borrow approval, return confirmation | LOW | Add notif call to assignment status change handler |
+| `GET /api/v1/notifications` (paginated) | Lists all notifications for current user | LOW | Filter by `user_id` from JWT; optional `unread_only` query param |
+| `PATCH /api/v1/notifications/{id}/read` | Marks single notification read | LOW | Sets `read_at = NOW()` |
+| `PATCH /api/v1/notifications/read-all` | Marks all unread for current user as read | LOW | Bulk update by `user_id WHERE read_at IS NULL` |
+| Frontend `useSSENotifications` hook | Opens `EventSource`, populates notification store, updates unread badge | MEDIUM | Replaces in-memory `useStore()` notifications with real API |
+| Notification bell badge (unread count) | Critical UX signal; number badge on bell icon | LOW | Already rendered in Topbar with `unreadCount` — just needs real data |
+
+**User-facing behavior (what users see):**
+1. User logs in → frontend opens `EventSource` connection to `/api/v1/notifications/stream?token=<jwt>`
+2. MQTT consumer detects `temperature` reading 81°C (> critical 75°C) → `create_notification(asset_manager_id, "Threshold Alert", "Asset SERVER-01: temperature critical (81°C)", "threshold_breach")` → DB insert + SSE push
+3. Bell icon in Topbar shows badge with unread count; count increments without page refresh
+4. User clicks bell → sidebar/page shows notification list fetched from REST API
+5. User clicks notification → `PATCH /read` → badge count decrements; `read_at` stamped
+6. "Mark all read" button → bulk PATCH → badge resets to zero
+
+### Differentiators — SSE
+
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| Per-user SSE stream (role-scoped events) | Admin sees all threshold breaches; Manager sees their assigned assets only; Employee sees own borrow/return events | MEDIUM | Filter on notification insert by role + resource ownership; not all users need all events |
+| Threshold event deduplication | Suppress duplicate notifications if same asset+metric already has an unread threshold alert in last 5 minutes | LOW | Query before insert: `SELECT 1 FROM notifications WHERE asset_id=X AND event_type='threshold_breach' AND read_at IS NULL AND created_at > NOW()-5min` |
+| SSE heartbeat (keep-alive comment) | Prevents browser/proxy from closing idle SSE connection | LOW | Send `: keep-alive\n\n` every 25s; standard SSE pattern |
+| Notification event_type taxonomy | Structured `event_type` field enables frontend filter tabs (already in notifications page: Risk Alerts / Maintenance / Assignments) | LOW | Defined enum: `threshold_breach`, `maintenance_status_change`, `assignment_approved`, `assignment_returned` |
+
+### Anti-Features — SSE
+
+| Anti-Feature | Why Requested | Why Problematic | Better Approach |
+|--------------|---------------|-----------------|-----------------|
+| WebSocket for notifications | "We already have WS for IoT, reuse it" | Multiplexing notification events into IoT WS creates coupling — IoT WS restarts would drop notifications; separate concerns | SSE for notifications (unidirectional, reconnects automatically, simpler auth); keep IoT WS for sensor charts only |
+| Email / SMS delivery | "Users should get alerts when not logged in" | Requires SMTP server, email templates, user preference management, unsubscribe flows — orthogonal to in-app milestone scope | In-app only for v2.2; add email in a dedicated "Notification Channels" milestone |
+| Browser Web Push API (Service Workers) | "Notifications should appear even when tab is closed" | Requires HTTPS, service worker registration, push subscription management, VAPID keys — massively over-engineered for demo | In-app SSE only; users must have the app open |
+| Long-poll fallback | "EventSource isn't supported everywhere" | All modern browsers support EventSource (>97% global support); polyfill adds code with no practical benefit | Use native `EventSource`; no polyfill |
+| Notification sound / desktop popup | "Alerts need to be unmissable" | UX distraction in a management system; requires permission request flow | Visual badge + bell animation on new event; no sound |
+| Separate notification microservice / Redis pub-sub | "Scale to millions of users" | Adds Redis, service mesh, and network hops for no benefit at demo scale (< 20 concurrent users) | Single FastAPI instance with in-process `asyncio.Queue` per SSE client; PostgreSQL LISTEN/NOTIFY optional at this scale |
+
+### SSE Data Model
 
 ```sql
-SELECT value, recorded_at AS ts
-FROM sensor_readings
-WHERE asset_id = :asset_id
-  AND metric   = :metric
-  AND recorded_at >= NOW() - :window_interval
-ORDER BY recorded_at ASC;
+CREATE TABLE notifications (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title      VARCHAR(200) NOT NULL,
+    body       TEXT NOT NULL,
+    event_type VARCHAR(50) NOT NULL,   -- 'threshold_breach' | 'maintenance_status_change' | 'assignment_approved' | 'assignment_returned'
+    asset_id   UUID REFERENCES assets(id) ON DELETE SET NULL,  -- nullable: not all events are asset-specific
+    read_at    TIMESTAMPTZ,            -- NULL = unread
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX ix_notifications_user_unread ON notifications(user_id, read_at) WHERE read_at IS NULL;
+CREATE INDEX ix_notifications_user_created ON notifications(user_id, created_at DESC);
 ```
 
-Satisfied by `ix_sensor_readings_asset_metric_time`. No pre-aggregation or materialized views needed for v2.1.
+**Why no `event_payload JSONB`:** The existing notification page uses fixed notification fields (title, body, type). A generic payload column adds query complexity with no frontend benefit at this scope.
+
+### SSE Endpoint Design
+
+```python
+@router.get("/notifications/stream")
+async def notification_stream(
+    token: str = Query(...),  # JWT in query param (EventSource cannot send headers)
+    db: Session = Depends(get_db),
+):
+    user = verify_token(token)  # raises 401 if invalid
+    queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+    manager.register(user.id, queue)
+
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=25.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"  # prevents proxy timeout
+        finally:
+            manager.unregister(user.id, queue)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+```
+
+**Why `asyncio.Queue` per client, not a broadcast list:** Prevents one slow client from blocking others; `maxsize=100` drops old events if client falls behind rather than accumulating unbounded memory.
+
+**`X-Accel-Buffering: no`:** Required when Nginx sits in front of FastAPI — disables Nginx response buffering so SSE bytes are flushed immediately. Without this, client receives events in delayed batches.
+
+### Threshold Detection Logic
+
+Plugs into existing `_process_message()` in `backend/app/mqtt/consumer.py`:
+
+```python
+CRITICAL_THRESHOLDS = {
+    "temperature": 75,
+    "humidity": 85,
+    "power": 1000,
+    "current": 12,
+    "vibration": 5,
+    "running_hours": 3000,
+}
+
+async def _check_threshold_and_notify(device_id, metric, value):
+    threshold = CRITICAL_THRESHOLDS.get(metric)
+    if threshold is None or value <= threshold:
+        return
+    # Dedup: skip if unread threshold_breach exists for this asset+metric in last 5 min
+    asset_id = device_cache.get(device_id)
+    if not asset_id or await _recent_breach_exists(asset_id, metric):
+        return
+    # Find manager/admin users to notify
+    managers = await _get_managers_for_asset(asset_id)
+    for manager_id in managers:
+        notif = await create_notification(
+            user_id=manager_id,
+            title=f"Threshold Alert: {metric}",
+            body=f"Asset {asset_id}: {metric} = {value} (critical > {threshold})",
+            event_type="threshold_breach",
+            asset_id=asset_id,
+        )
+        await sse_manager.push(manager_id, notif)
+```
 
 ---
 
 ## Feature Dependencies
 
 ```
-Mosquitto Docker service
-    ↓
-Sensor Simulator (connects to Mosquitto, reads DB for device list)
-    ↓
-FastAPI MQTT Consumer (aiomqtt, subscribes sensors/# in lifespan task)
-    ↓
-sensor_readings table (Alembic migration 0002)
-    ↓
-ConnectionManager + WebSocket endpoint /ws/iot
-    ↓
-Historical REST endpoint GET /api/v1/sensor-readings
-    ↓
-Frontend useIoTWebSocket hook + REST backfill in iot/page.tsx
+EXISTING (v2.0 + v2.1)
+├── sensor_readings table (v2.1) ─────────────────────────────────────────┐
+├── MQTT consumer / _process_message() (v2.1) ───────────────────────────┐│
+├── JWT auth / get_current_user (v2.0) ──────────────────────────────────┐││
+├── assets table + RBAC (v2.0) ─────────────────────────────────────────┐│││
+├── maintenance/assignment models (v2.0) ──────────────────────────────┐││││
+└── Frontend mock AI/Notifications pages (v1.3) ──────────────────────┐│││││
+                                                                        ││││││
+NEW (v2.2)                                                              ││││││
+├── [AI] Offline training script (train_model.py) ────requires──────────┘│││││
+│       └── produces model.pkl ────────────────────────────────────────┐ ││││
+│                                                                       │ ││││
+├── [AI] ai_recommendations table (migration 0003) ─────────────────────┘ ││││
+│       └── requires: assets table FK ─────────────────────────────────────┘│││
+│                                                                            │││
+├── [AI] Inference endpoint POST /ai/recommendations/infer/{asset_id} ───────┘││
+│       └── requires: model.pkl + sensor_readings + ai_recommendations table  ││
+│                                                                              ││
+├── [AI] CRUD endpoints (GET list, GET detail, PATCH approve/reject) ──────────┘│
+│       └── requires: ai_recommendations table + JWT auth                       │
+│                                                                                │
+├── [AI] Frontend AI page wire-up ───────────────────────────────────────────────┘
+│       └── replaces buildRecommendations() mock with real API calls
+│
+├── [SSE] notifications table (migration 0004) ─────requires── users FK (v2.0)
+│       └── requires: users table FK
+│
+├── [SSE] Notification creation service ────────────────────────────────────────────
+│       └── no dependencies beyond notifications table
+│
+├── [SSE] Trigger: MQTT threshold breach ──────────────────────────────────────────
+│       └── requires: MQTT consumer (v2.1) + notification service
+│
+├── [SSE] Triggers: Maintenance/Assignment events ─────────────────────────────────
+│       └── requires: existing maintenance/assignment routers (v2.0) + notif service
+│
+├── [SSE] SSE stream endpoint GET /notifications/stream ───────────────────────────
+│       └── requires: notifications table + JWT token-in-query-param auth
+│
+├── [SSE] REST notification endpoints (GET list, PATCH read/read-all) ────────────
+│       └── requires: notifications table + JWT auth
+│
+└── [SSE] Frontend useSSENotifications hook + bell badge ──────────────────────────
+        └── requires: SSE endpoint + REST endpoints
 ```
 
-No feature can be built out of order. Migration must exist before consumer can write. Consumer must be running before WebSocket can relay anything. Frontend hook is the terminal dependency.
+### Dependency Notes
+
+- **AI inference requires sensor_readings:** Model features are computed from rolling windowed aggregates. At least 24h of readings needed for meaningful features. Run training script after v2.1 has been collecting data for ≥1 day.
+- **AI and SSE tracks are independent:** SSE notifications do not require AI to be built first, and vice versa. AI approval can trigger a notification (differentiator), but it is not required for either track to ship.
+- **MQTT threshold trigger requires v2.1 MQTT consumer:** The threshold detection logic hooks into `_process_message()` — v2.1 must be complete before SSE trigger 1 can be implemented.
+- **Frontend mock pages require no changes to UI structure:** Both `ai/page.tsx` and `notifications/page.tsx` already render the correct UI. Only data-fetching code changes (remove mock imports, add API hooks).
 
 ---
 
-## MVP Recommendation for v2.1
+## Feature Prioritization Matrix
 
-Build in this order:
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| `ai_recommendations` migration + CRUD endpoints | HIGH | LOW | P1 |
+| Offline training script | HIGH | MEDIUM | P1 |
+| Inference endpoint | HIGH | MEDIUM | P1 |
+| Frontend AI page wire-up | HIGH | MEDIUM | P1 |
+| Manager approval / reject gate | HIGH | LOW | P1 |
+| `notifications` migration + REST CRUD | HIGH | LOW | P1 |
+| SSE stream endpoint | HIGH | MEDIUM | P1 |
+| Frontend `useSSENotifications` hook | HIGH | MEDIUM | P1 |
+| Notification bell badge (unread count) | HIGH | LOW | P1 |
+| MQTT threshold trigger | HIGH | MEDIUM | P1 |
+| Maintenance/assignment triggers | MEDIUM | LOW | P2 |
+| Feature engineering (windowed aggregates) | HIGH | MEDIUM | P2 |
+| Auto-create maintenance request on AI approval | MEDIUM | MEDIUM | P2 |
+| Threshold dedup logic | MEDIUM | LOW | P2 |
+| Per-user role-scoped SSE filtering | MEDIUM | MEDIUM | P2 |
+| Infer-all batch endpoint | LOW | LOW | P3 |
+| SSE heartbeat keep-alive | MEDIUM | LOW | P2 |
 
-1. **Migration 0002** — `sensor_readings` table with indexes (0.5 days)
-2. **Docker Compose + Mosquitto** — add broker service, `MQTT_BROKER_HOST` to `.env.example` (0.5 days)
-3. **Simulator script** — `backend/simulator/run.py`, reads DB, 5s publish loop (1 day)
-4. **MQTT consumer + ConnectionManager** — aiomqtt subscriber in lifespan, `app/routers/iot.py` (1.5 days)
-5. **Historical REST endpoint** — `GET /api/v1/sensor-readings?asset_id=X&metric=Y&window=6h` (0.5 days)
-6. **Frontend hook** — `useIoTWebSocket` replaces `generateReadings()` and `useStore()` calls in `iot/page.tsx` (1.5 days)
+**Priority key:**
+- P1: Ship in v2.2 — core feature, directly visible to users
+- P2: Ship in v2.2 — correctness/polish, not blocking but important
+- P3: Defer — low value for the effort
 
-**Total: ~5.5 engineering days** for a complete, functional IoT pipeline.
+---
 
-**Defer to v2.2:** Server-side threshold alert events (pairs with notification pipeline already planned in PROJECT.md).
+## MVP Recommendation for v2.2
+
+**AI track build order:**
+1. Migration `0003_ai_recommendations` + SQLAlchemy model (0.5 day)
+2. Training script `scripts/train_model.py` with feature engineering (1.5 days)
+3. Inference service + inference endpoint (1 day)
+4. CRUD endpoints (GET list, GET detail) + Pydantic schemas (0.5 day)
+5. Approval/reject endpoints (0.5 day)
+6. Frontend AI page wire-up — replace `buildRecommendations()` mock (1 day)
+
+**SSE track build order:**
+1. Migration `0004_notifications` + SQLAlchemy model (0.5 day)
+2. Notification creation service + `SseManager` class (1 day)
+3. SSE stream endpoint with JWT query-param auth (1 day)
+4. REST CRUD endpoints (GET list, PATCH read, PATCH read-all) (0.5 day)
+5. MQTT threshold trigger + dedup (1 day)
+6. Maintenance/assignment status-change triggers (0.5 day)
+7. Frontend `useSSENotifications` hook + bell badge wire-up (1 day)
+
+**Total: ~10.5 engineering days** for both tracks.
+
+**Tracks can be built in parallel** by two developers — no shared code until integration (AI approval trigger → notification in v2.3+).
 
 ---
 
 ## Sources
 
-- Codebase inspection (HIGH confidence): `frontend/app/dashboard/iot/page.tsx`, `backend/app/models/asset.py`, `backend/requirements.txt`, `docker-compose.yml`, `alembic/versions/0001_initial.py`
-- Project specification (HIGH confidence): `.planning/PROJECT.md`
-- FastAPI WebSocket ConnectionManager pattern: official FastAPI docs (standard pattern, widely confirmed)
-- PostgreSQL row volume estimate: arithmetic from 5s interval × 8 devices × 5 metrics × 7 days
+- Codebase inspection (HIGH confidence): `frontend/app/dashboard/ai/page.tsx`, `frontend/lib/predictive.ts`, `frontend/lib/ai-governance.ts`, `frontend/app/dashboard/notifications/page.tsx`, `frontend/lib/api.ts`, `backend/app/mqtt/consumer.py`, `backend/app/models/sensor_reading.py`, `backend/app/dependencies.py`
+- Project specification (HIGH confidence): `.planning/PROJECT.md` (v2.2 requirements block)
+- SSE + FastAPI pattern: standard `StreamingResponse` with `text/event-stream`; well-documented in FastAPI community; `X-Accel-Buffering: no` is a production-proven Nginx header
+- scikit-learn Random Forest: stable API, no version concerns; `joblib.dump/load` for artifact persistence is idiomatic scikit-learn
+- EventSource auth via query param: widely used workaround for `EventSource` header limitation (GitHub, various SaaS implementations)
