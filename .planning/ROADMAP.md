@@ -650,3 +650,14 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 
 ---
 *v2.1 roadmap archived: 2026-07-05*
+
+---
+
+## v2.2: AI Predictive Maintenance & Notifications
+
+- [ ] **Phase 36: AI & Notification DB Migrations** — Alembic migrations 0003 (`ai_recommendations`) + 0004 (`notifications`); SQLAlchemy ORM models for both tables *(REQ: AI-01, NOTIF-01)*
+- [ ] **Phase 37: Offline ML Training Script** — `backend/scripts/train_model.py`: reads `sensor_readings`, engineers per-asset features (mean/std/max per metric over 7 days), trains Random Forest, saves `backend/model/model.pkl` via joblib *(REQ: AI-02)*
+- [ ] **Phase 38: AI Inference & Approval Endpoints** — `app/services/ai_service.py` (load model once at import, feature engineering, inference → recommendation + confidence + risk), `app/routers/ai.py` with `POST /api/v1/ai/recommendations`, `GET /api/v1/ai/recommendations`, `POST /api/v1/ai/recommendations/{id}/approve`, `POST /api/v1/ai/recommendations/{id}/defer` *(REQ: AI-03, AI-04, AI-05)*
+- [ ] **Phase 39: SSE Notification Infrastructure** — `app/services/notification_manager.py` (asyncio.Queue per user, asyncio.Lock, singleton mirroring ConnectionManager), `app/routers/notifications.py` (`GET /api/v1/notifications/stream` with `?token=` JWT auth, `GET /api/v1/notifications`, `PATCH /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/read-all`), wired into lifespan *(REQ: NOTIF-03, NOTIF-04)*
+- [ ] **Phase 40: Notification Trigger Wiring** — modify `consumer.py` to evaluate MQTT thresholds (cpu_usage>90%, temperature>75°C etc.) and push notifications to all Managers/Admins; modify `assignments.py` router to push on assignment create/return; modify `maintenance.py` router to push on status change *(REQ: NOTIF-02)*
+- [ ] **Phase 41: Frontend AI & Notification Wiring** — `frontend/hooks/useNotifications.ts` (EventSource hook with `?token=` JWT, appends to store `notifications[]`); wire AI page to real API (remove `seedRecommendations`, call `GET /api/v1/ai/recommendations`, `POST .../approve`, `POST .../defer`); wire Notifications page to REST (remove `SEED_NOTIFICATIONS`); bell badge shows live `unreadCount` *(REQ: AI-06, NOTIF-05)*

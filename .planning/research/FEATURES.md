@@ -1,45 +1,34 @@
-# IoT Pipeline Feature Research
+# Feature Research: v2.2 AI Predictive Maintenance & SSE Notifications
 
-**Project:** AI-Powered Asset Management System — v2.1 IoT Pipeline  
-**Domain:** Industrial IoT sensor telemetry pipeline + real-time dashboard  
+**Project:** AI-Powered Asset Management System — v2.2  
+**Domain:** ML inference pipeline + server-sent event notification delivery  
 **Researched:** 2026-07-05  
-**Confidence:** HIGH (grounded in existing codebase inspection)
+**Confidence:** HIGH (grounded in codebase inspection + production SSE/ML patterns)
 
 ---
 
 ## Codebase Anchor
 
-Before defining features, key facts extracted from the existing code inform every decision below:
+Key facts from existing code — every feature decision below is grounded here.
 
 | Fact | Source | Implication |
 |------|--------|-------------|
-| 6 sensor metrics already defined: `temperature`, `humidity`, `power`, `current`, `vibration`, `running_hours` | `frontend/app/dashboard/iot/page.tsx` — `SENSOR_CONFIG` | Simulator must emit exactly these 6 keys; no new metric invention needed |
-| Per-category sensor assignment already coded | `SENSOR_CATEGORY_MAP` in `page.tsx` | Simulator must respect same mapping (Laptop: 5 sensors, Forklift: no humidity, etc.) |
-| Threshold values already in frontend | `warning`/`critical` per metric in `SENSOR_CONFIG` | FastAPI threshold eval must use same constants; no drift |
-| Chart data format: `{ ts: number, value: number }[]` | `generateReadings()` return type | WebSocket message format must match this shape exactly for zero frontend change |
-| Time windows: 1h, 6h, 24h, 7d | `WINDOWS` array | DB retention must cover at least 7 days; historical API must support these window queries |
-| Assets have `sensor_device_id: String(100)` | `backend/app/models/asset.py` | MQTT topic structure must use `sensor_device_id` as device identifier |
-| No `aiomqtt`, `paho-mqtt`, or `websockets` in requirements.txt | `backend/requirements.txt` | All three must be added as new dependencies |
-| Docker Compose has: `db`, `api`, `pgadmin` — no broker | `docker-compose.yml` | Mosquitto service must be added as new Docker Compose entry |
-| Single Alembic migration `0001_initial.py` — no `sensor_readings` table | `alembic/versions/` | Migration `0002_sensor_readings.py` needed |
+| `sensor_readings` table exists with composite index on `(device_id, metric, recorded_at)` | `backend/alembic/versions/0002_sensor_readings.py`, `app/models/sensor_reading.py` | Training data available; no new migration needed for reads |
+| `PredictiveRecommendation` type fully defined: `confidence.score`, `confidence.band`, `risk.level`, `risk.score`, `actionState`, `slaDueAt`, `deferReason` | `frontend/lib/predictive.ts` | ML output schema must map to this type exactly — zero frontend type changes |
+| AI page already has approve/defer dialogs, SLA countdown, leaderboard — fully functional with mock data | `frontend/app/dashboard/ai/page.tsx` | Backend just needs to serve `ai_recommendations`; no UI changes needed |
+| `getConfidenceBand()` maps numeric confidence → `"low" \| "medium" \| "high" \| "very-high"` | `frontend/lib/ai-governance.ts` | ML confidence score (0–1 float) maps to these bands via thresholds |
+| Notifications page uses `useStore().notifications`, `markNotificationRead`, `markAllNotificationsRead`, `unreadCount` | `frontend/app/dashboard/notifications/page.tsx` | SSE hook must populate same store shape; no page-level UI changes needed |
+| `apiFetch` wrapper in `lib/api.ts` attaches JWT bearer token automatically | `frontend/lib/api.ts` | SSE `EventSource` does NOT support custom headers — requires token-in-URL or cookie auth for SSE |
+| MQTT consumer already running in FastAPI lifespan; processes all sensor readings | `backend/app/mqtt/consumer.py` | Threshold detection logic plugs directly into `_process_message()` — no new consumer needed |
+| Sensor critical thresholds (from `SENSOR_CONFIG`): temperature 75°C, humidity 85%, power 1000W, current 12A, vibration 5 mm/s, running_hours 3000h | `frontend/app/dashboard/iot/page.tsx` | Backend threshold constants must match frontend exactly; no drift |
+| JWT RBAC: `get_current_user` + `require_role` dependencies already in `app/dependencies.py` | `backend/app/dependencies.py` | All new endpoints get auth for free via dependency injection |
+| Manager role = "manager" in DB; Admin = "admin" | `backend/app/models/user.py` | Approval gate uses `require_role(["manager", "admin"])` |
 
 ---
 
-## Table Stakes (Must Have)
+## Feature Landscape
 
-Features the system cannot function without. Missing any one = broken pipeline.
-
-| Feature | Why Required | Complexity | Codebase Dependency |
-|---------|--------------|------------|---------------------|
-| `sensor_readings` PostgreSQL table + Alembic migration | Central storage for all sensor data | Low | New migration `0002`; FK to `assets.id` |
-| Mosquitto broker service in Docker Compose | Message bus; simulator and consumer need it | Low | Add `eclipse-mosquitto:2` service to `docker-compose.yml` |
-| Python sensor simulator script | Generates synthetic telemetry matching frontend `SENSOR_CONFIG` base values | Medium | Reads seeded assets from DB to know which `sensor_device_id` to publish for |
-| FastAPI MQTT consumer (aiomqtt) | Subscribes to all sensor topics, validates, inserts into `sensor_readings` | Medium | Runs in `lifespan` background task in `app/main.py` |
-| FastAPI WebSocket endpoint `GET /ws/iot` | Pushes live readings to frontend; replaces `generateReadings()` mock | Medium | New router `app/routers/iot.py`; ConnectionManager class |
-| Historical readings REST endpoint `GET /api/v1/sensor-readings` | Frontend time-window charts need historical data on load/window change | Medium | Query `sensor_readings` filtered by `asset_id` + `window` param; return `[{ts, value}]` |
-| Frontend WebSocket hook | Replaces mock `generateReadings()` calls with real WS data; updates chart state | Medium | Modify `frontend/app/dashboard/iot/page.tsx` — swap mock store reads for WS + REST fetch |
-
-**Total table-stakes scope:** 1 DB migration + 1 Docker service + 1 simulator script + 2 backend features + 1 frontend wiring change.
+This milestone adds two independent feature tracks: **AI Predictive Maintenance** (ML inference pipeline + approval workflow) and **SSE Notifications** (real-time in-app delivery). They share the existing auth layer and sensor data but are otherwise decoupled — either can be built without the other.
 
 ---
 
