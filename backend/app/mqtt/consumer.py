@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 
 import aiomqtt
 
@@ -12,6 +13,21 @@ from app.services.websocket_manager import connection_manager
 logger = logging.getLogger(__name__)
 
 _RECONNECT_INTERVAL = 5  # seconds between broker reconnect attempts
+
+# ─── Threshold config (mirrors frontend SENSOR_CONFIG critical thresholds) ───
+_THRESHOLDS: dict[str, float] = {
+    "temperature": 75.0,    # °C
+    "humidity": 85.0,       # %
+    "power": 1000.0,        # W
+    "current": 12.0,        # A
+    "vibration": 5.0,       # mm/s
+    "running_hours": 3000.0,  # h
+}
+
+# Cooldown: (device_id, metric) → last_alerted_epoch_seconds
+# Prevents alert storms: one alert per device+metric per 5 minutes.
+_ALERT_COOLDOWN_SECS = 300
+_last_alerted: dict[tuple[str, str], float] = {}
 
 
 def _write_to_db(
@@ -56,9 +72,67 @@ def _write_to_db(
         db.close()  # ALWAYS close — prevents connection pool exhaustion
 
 
+async def _send_threshold_alert(
+    device_id: str, metric: str, value: float, threshold: float
+) -> None:
+    """
+    NOTIF-02: Persist notification rows for all Managers/Admins and push via SSE.
+    Runs as a fire-and-forget task — never blocks the message receive loop.
+    DB writes are offloaded to thread pool (sync SQLAlchemy constraint).
+    """
+    from app.services.notification_service import create_and_push, get_managers_and_admins
+    from app.services.notification_manager import notification_manager
+
+    title = f"Sensor threshold breach — {metric} on {device_id}"
+    message = (
+        f"{metric.replace('_', ' ').title()} reached {value:.1f} "
+        f"(threshold: {threshold:.1f}) on device {device_id}."
+    )
+    href = "/dashboard/iot"
+
+    def _persist_alerts():
+        db = SessionLocal()
+        try:
+            managers = get_managers_and_admins(db)
+            notifications = []
+            for user in managers:
+                notif = create_and_push(
+                    db,
+                    user_id=str(user.id),
+                    notification_type="high_failure_risk",
+                    title=title,
+                    message=message,
+                    href=href,
+                )
+                notifications.append((str(user.id), notif))
+            return notifications
+        finally:
+            db.close()
+
+    try:
+        notifications = await asyncio.to_thread(_persist_alerts)
+        for user_id, notif in notifications:
+            await notification_manager.push(
+                user_id,
+                {
+                    "id": str(notif.id),
+                    "user_id": user_id,
+                    "type": notif.type,
+                    "title": notif.title,
+                    "message": notif.message,
+                    "is_read": False,
+                    "href": notif.href,
+                    "created_at": notif.created_at.isoformat(),
+                },
+            )
+    except Exception:
+        logger.exception("Failed to send threshold alert for %s/%s", device_id, metric)
+
+
 async def _process_message(topic: str, payload_bytes: bytes) -> None:
     """
-    Parse one MQTT message, write to DB (via thread), broadcast to WS clients.
+    Parse one MQTT message, write to DB (via thread), broadcast to WS clients,
+    and check thresholds for notification triggers.
     Spawned as an asyncio.Task per message — never awaited directly in the
     message loop (a 20ms DB write would block MQTT ACKs if awaited inline).
     """
@@ -96,6 +170,17 @@ async def _process_message(topic: str, payload_bytes: bytes) -> None:
             "ts": ts_ms,
         },
     )
+
+    # --- Threshold alerting (NOTIF-02) ---
+    threshold = _THRESHOLDS.get(metric)
+    if threshold is not None and value >= threshold:
+        cooldown_key = (device_id, metric)
+        now = time.monotonic()
+        if now - _last_alerted.get(cooldown_key, 0.0) >= _ALERT_COOLDOWN_SECS:
+            _last_alerted[cooldown_key] = now
+            asyncio.create_task(
+                _send_threshold_alert(device_id, metric, value, threshold)
+            )
 
 
 async def start_mqtt_consumer() -> None:
