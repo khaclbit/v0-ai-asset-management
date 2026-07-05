@@ -643,7 +643,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 ## Phases
 
 - [x] **Phase 31: Sensor Readings Data Model & Migration** — SQLAlchemy `SensorReading` model and Alembic migration `0002_sensor_readings.py` with composite index; no FK to assets (string-match at query time) (completed 2026-07-05)
-- [ ] **Phase 32: Mosquitto Broker & Docker Compose Integration** — Add `eclipse-mosquitto:2.0.22` Docker Compose service with explicit `listener 1883 / allow_anonymous true` config; wire `MQTT_HOST`/`MQTT_PORT` into api service and config.py
+- [x] **Phase 32: Mosquitto Broker & Docker Compose Integration** — Add `eclipse-mosquitto:2.0.22` Docker Compose service with explicit `listener 1883 / allow_anonymous true` config; wire `MQTT_HOST`/`MQTT_PORT` into api service and config.py (completed 2026-07-05)
 - [ ] **Phase 33: WebSocket ConnectionManager + MQTT Consumer + IoT Router** — `ConnectionManager` (set + asyncio.Lock), aiomqtt consumer launched via lifespan `asyncio.create_task`, WebSocket endpoint `/api/v1/iot/ws/{device_id}`, REST backfill endpoint `/api/v1/iot/readings/{device_id}`
 - [ ] **Phase 34: Sensor Simulator** — `scripts/sensor_simulator.py` publishing all 6 `SENSOR_CONFIG` metrics every 5 s over aiomqtt; `seed.py` updated with `sensor_device_id` values; end-to-end pipeline smoke-tested
 - [ ] **Phase 35: Frontend IoT Wiring** — `useIotWebSocket` hook with reconnect + cleanup, `iotApi` namespace in `frontend/lib/api.ts`, IoT Monitoring page replaces `generateReadings()` mock with hook + history backfill
@@ -682,7 +682,7 @@ Plans:
   2. `mosquitto_pub -h localhost -p 1883 -t test/ping -m hello` published from the host is echoed back by `mosquitto_sub -h localhost -p 1883 -t test/ping` — confirming anonymous connections are accepted
   3. `docker compose up api` starts without missing-env errors; `GET /api/v1/health` (or equivalent) returns 200 — confirming `MQTT_BROKER_HOST` and `MQTT_BROKER_PORT` are present in config
 
-**Plans:** TBD
+**Plans:** 1/1 plans complete
 
 ---
 
