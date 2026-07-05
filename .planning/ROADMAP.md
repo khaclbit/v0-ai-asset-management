@@ -634,144 +634,19 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 
 ---
 
-## Milestone v2.1: IoT Pipeline & Real-Time Data
 
-**Goal:** Build the end-to-end IoT sensor telemetry pipeline — Python sensor simulator → Mosquitto MQTT broker → FastAPI MQTT consumer → `sensor_readings` PostgreSQL table → WebSocket broadcast → Next.js IoT Monitoring page — replacing all mock sensor data with real live readings.
-**Phases:** 5 (Phase 31–35)
-**Requirements mapped:** 21
+<details>
+<summary>✅ v2.1: IoT Pipeline & Real-Time Data — 5 phases, 21 requirements, shipped 2026-07-05</summary>
 
-## Phases
+- [x] Phase 31: Sensor Readings Data Model & Migration — SensorReading model, Alembic migration 0002, composite index
+- [x] Phase 32: Mosquitto Broker & Docker Compose Integration — eclipse-mosquitto:2.0.22, listener 1883, service_healthy
+- [x] Phase 33: WebSocket ConnectionManager + MQTT Consumer + IoT Router — aiomqtt consumer, asyncio.to_thread bridge, WS + REST endpoints
+- [x] Phase 34: Sensor Simulator — sensor_simulator.py (6 metrics, 5 devices, 5s), seed_iot_assets()
+- [x] Phase 35: Frontend IoT Wiring — useIotWebSocket hook, iotApi namespace, generateReadings() removed
 
-- [x] **Phase 31: Sensor Readings Data Model & Migration** — SQLAlchemy `SensorReading` model and Alembic migration `0002_sensor_readings.py` with composite index; no FK to assets (string-match at query time) (completed 2026-07-05)
-- [x] **Phase 32: Mosquitto Broker & Docker Compose Integration** — Add `eclipse-mosquitto:2.0.22` Docker Compose service with explicit `listener 1883 / allow_anonymous true` config; wire `MQTT_HOST`/`MQTT_PORT` into api service and config.py (completed 2026-07-05)
-- [ ] **Phase 33: WebSocket ConnectionManager + MQTT Consumer + IoT Router** — `ConnectionManager` (set + asyncio.Lock), aiomqtt consumer launched via lifespan `asyncio.create_task`, WebSocket endpoint `/api/v1/iot/ws/{device_id}`, REST backfill endpoint `/api/v1/iot/readings/{device_id}`
-- [ ] **Phase 34: Sensor Simulator** — `scripts/sensor_simulator.py` publishing all 6 `SENSOR_CONFIG` metrics every 5 s over aiomqtt; `seed.py` updated with `sensor_device_id` values; end-to-end pipeline smoke-tested
-- [ ] **Phase 35: Frontend IoT Wiring** — `useIotWebSocket` hook with reconnect + cleanup, `iotApi` namespace in `frontend/lib/api.ts`, IoT Monitoring page replaces `generateReadings()` mock with hook + history backfill
+Full details: `.planning/milestones/v2.1-ROADMAP.md`
 
----
-
-### Phase 31: Sensor Readings Data Model & Migration
-
-**Goal:** The `sensor_readings` table exists in PostgreSQL, is indexed for fast time-range queries, and is intentionally decoupled from `assets` to keep the ingestion path write-optimised.
-**Depends on:** Phase 30 (existing Alembic baseline `0001`)
-**Requirements:** IOT-DB-01, IOT-DB-02, IOT-DB-03
-
-**Success Criteria** (what must be TRUE):
-
-  1. `docker compose exec api alembic upgrade head` completes without error and `\d sensor_readings` shows all seven columns (`id` UUID PK, `device_id`, `asset_id` nullable, `metric`, `value` float, `unit`, `recorded_at` timestamptz)
-  2. `EXPLAIN` on `SELECT … WHERE device_id = ? AND metric = ? AND recorded_at > ?` uses the composite index `(device_id, metric, recorded_at DESC)` — no sequential scan
-  3. A manual INSERT into `sensor_readings` with a `device_id` that has no matching row in `assets` succeeds without FK violation — confirming the intentional no-FK design
-
-**Plans:** 1/1 plans complete
-
-Plans:
-
-- [x] 31-01-PLAN.md — Create SensorReading model, migration 0002, register in env.py, verify all three IOT-DB requirements
+</details>
 
 ---
-
-### Phase 32: Mosquitto Broker & Docker Compose Integration
-
-**Goal:** The Mosquitto 2.x broker runs as a Docker Compose service, accepts anonymous MQTT connections on port 1883, and the FastAPI api service has MQTT connection settings available via environment variables.
-**Depends on:** Phase 31
-**Requirements:** IOT-MQTT-01, IOT-MQTT-02, IOT-MQTT-03
-
-**Success Criteria** (what must be TRUE):
-
-  1. `docker compose up mosquitto` starts cleanly; `docker logs mosquitto` shows `Opening ipv4 listen socket on port 1883` — confirming the listener is active (not the Mosquitto 2.x silent-refusal default)
-  2. `mosquitto_pub -h localhost -p 1883 -t test/ping -m hello` published from the host is echoed back by `mosquitto_sub -h localhost -p 1883 -t test/ping` — confirming anonymous connections are accepted
-  3. `docker compose up api` starts without missing-env errors; `GET /api/v1/health` (or equivalent) returns 200 — confirming `MQTT_BROKER_HOST` and `MQTT_BROKER_PORT` are present in config
-
-**Plans:** 1/1 plans complete
-
----
-
-### Phase 33: WebSocket ConnectionManager + MQTT Consumer + IoT Router
-
-**Goal:** The FastAPI backend subscribes to `sensors/+/+`, persists every received reading to PostgreSQL without blocking the event loop, and immediately broadcasts each reading to all connected WebSocket clients — all wired into the application lifespan so the consumer survives indefinitely.
-**Depends on:** Phase 32
-**Requirements:** IOT-CONS-01, IOT-CONS-02, IOT-CONS-03, IOT-CONS-04, IOT-WS-01, IOT-WS-02, IOT-WS-03, IOT-WS-04
-
-**Success Criteria** (what must be TRUE):
-
-  1. Publishing a test MQTT message to `sensors/DEV-001/temperature` (value 42.0) results in a new row in `sensor_readings` within 1 second — confirming the consumer receives, parses, and persists via `asyncio.to_thread()` without blocking
-  2. A WebSocket client connected to `ws://localhost:8000/api/v1/iot/ws/DEV-001` receives a JSON frame `{"device_id":"DEV-001","metric":"temperature","value":42.0,"ts":<ms>}` immediately after the MQTT publish — confirming the broadcast path
-  3. `GET /api/v1/iot/readings/DEV-001?metric=temperature&limit=10` returns a JSON array of up to 10 readings in descending `recorded_at` order — confirming the REST backfill endpoint
-  4. `docker compose stop api && docker compose start api` — MQTT consumer restarts cleanly via lifespan without zombie tasks or `CancelledError` tracebacks in logs
-
-**Plans:** 2 plans
-
-Plans:
-- [ ] 33-01-PLAN.md — Foundation: ConnectionManager singleton, MQTT consumer package, SensorReadingOut schema
-- [ ] 33-02-PLAN.md — Router + Wiring: IoT router (WS + REST endpoints), lifespan task lifecycle, aiomqtt dependency
-**UI hint**: yes
-
----
-
-### Phase 34: Sensor Simulator
-
-**Goal:** A local Python script publishes realistic synthetic sensor data for all 6 `SENSOR_CONFIG` metrics at 5-second intervals across all seeded device IDs, providing a fully observable end-to-end pipeline from simulator through broker, consumer, database, and WebSocket.
-**Depends on:** Phase 33
-**Requirements:** IOT-SIM-01, IOT-SIM-02, IOT-SIM-03
-
-**Success Criteria** (what must be TRUE):
-
-  1. `python scripts/sensor_simulator.py` connects to Mosquitto and begins publishing; `docker logs` for the `api` service shows INSERT confirmations for all 6 metric keys (`temperature`, `humidity`, `power`, `current`, `vibration`, `running_hours`) within 30 seconds — confirming metric coverage matches `SENSOR_CONFIG`
-  2. After 60 seconds of simulator running, `SELECT COUNT(*) FROM sensor_readings GROUP BY metric` shows ≥ 6 rows per metric per seeded device — confirming the 5-second interval and all device IDs are targeted
-  3. `SIGINT` (Ctrl-C) on the simulator exits cleanly within 2 seconds with no `asyncio` exception traceback — confirming graceful `aiomqtt` shutdown
-
-**Plans:** 1 plan
-
-Plans:
-- [ ] 34-01-PLAN.md — Create sensor_simulator.py + extend seed.py with seed_iot_assets()
-
----
-
-### Phase 35: Frontend IoT Wiring
-
-**Goal:** The IoT Monitoring page sources all sensor data from the live backend — WebSocket stream for real-time updates and REST history fetch for cold-start backfill — with `generateReadings()` mock fully removed and the hook surviving `docker compose restart api`.
-**Depends on:** Phase 34
-**Requirements:** IOT-FE-01, IOT-FE-02, IOT-FE-03, IOT-FE-04
-
-**Success Criteria** (what must be TRUE):
-
-  1. Loading `/dashboard/iot` with the simulator running shows live-updating line charts within 5 seconds — `generateReadings()` import is absent from `iot/page.tsx` and charts populate from `useIotWebSocket` hook state
-  2. On fresh page load (before the first WebSocket message), charts show historical data backfilled from `GET /api/v1/iot/readings/{device_id}` — no empty chart flash on initial mount
-  3. `docker compose restart api` while the IoT page is open causes a momentary disconnect; the page auto-reconnects within 10 seconds and resumes streaming without a browser refresh
-  4. Opening two browser tabs on `/dashboard/iot` with the same `deviceId` and publishing a single MQTT message results in exactly one new data point on each tab's chart — confirming no duplicate subscriptions from React StrictMode double-mount
-
-**Plans:** TBD
-**UI hint**: yes
-
----
-
-### v2.1 Requirement Traceability
-
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| IOT-DB-01 | Phase 31 | Pending |
-| IOT-DB-02 | Phase 31 | Pending |
-| IOT-DB-03 | Phase 31 | Pending |
-| IOT-MQTT-01 | Phase 32 | Pending |
-| IOT-MQTT-02 | Phase 32 | Pending |
-| IOT-MQTT-03 | Phase 32 | Pending |
-| IOT-CONS-01 | Phase 33 | Pending |
-| IOT-CONS-02 | Phase 33 | Pending |
-| IOT-CONS-03 | Phase 33 | Pending |
-| IOT-CONS-04 | Phase 33 | Pending |
-| IOT-WS-01 | Phase 33 | Pending |
-| IOT-WS-02 | Phase 33 | Pending |
-| IOT-WS-03 | Phase 33 | Pending |
-| IOT-WS-04 | Phase 33 | Pending |
-| IOT-SIM-01 | Phase 34 | Pending |
-| IOT-SIM-02 | Phase 34 | Pending |
-| IOT-SIM-03 | Phase 34 | Pending |
-| IOT-FE-01 | Phase 35 | Pending |
-| IOT-FE-02 | Phase 35 | Pending |
-| IOT-FE-03 | Phase 35 | Pending |
-| IOT-FE-04 | Phase 35 | Pending |
-
-**v2.1 Coverage: 21/21 requirements mapped ✓**
-
----
-*v2.1 roadmap appended: 2026-07-05 for milestone v2.1 IoT Pipeline & Real-Time Data*
+*v2.1 roadmap archived: 2026-07-05*

@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: IoT Pipeline & Real-Time Data
-status: completed
+status: archived
 stopped_at: Milestone v2.0 started
 last_updated: "2026-07-05T15:45:33.955Z"
-last_activity: 2026-07-05 -- Phase 35 marked complete — v2.1 COMPLETE
+last_activity: 2026-07-05 -- v2.1 milestone archived
 progress:
   total_phases: 5
   completed_phases: 5
