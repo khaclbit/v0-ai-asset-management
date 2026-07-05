@@ -3,6 +3,7 @@ from app.models.user import User, UserRole
 from app.models.asset import Asset, AssetCategory, AssetStatus, ASSET_TRANSITIONS
 from app.models.assignment import Assignment, AssignmentStatus
 from app.models.maintenance import MaintenanceRecord, MaintenanceStatus, MAINTENANCE_TRANSITIONS
+from app.models.sensor_reading import SensorReading
 
 __all__ = [
     "Base",
@@ -17,4 +18,5 @@ __all__ = [
     "MaintenanceRecord",
     "MaintenanceStatus",
     "MAINTENANCE_TRANSITIONS",
+    "SensorReading",
 ]
