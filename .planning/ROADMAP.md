@@ -673,7 +673,12 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
   2. `alembic upgrade head` creates `notifications` with all required columns (id, user_id FK, type, title, message, is_read, reference_id nullable, reference_type nullable, created_at)
   3. `alembic downgrade -1` and `alembic upgrade head` cycle completes without error (migrations are reversible)
   4. Both tables have the expected indexes visible in `\d+ ai_recommendations` / `\d+ notifications` (asset_id+created_at DESC; user_id+is_read; user_id+created_at DESC)
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 36-01-PLAN.md — Write Alembic migrations 0003 (ai_recommendations) + 0004 (notifications)
+- [ ] 36-02-PLAN.md — Write ORM models AiRecommendation + Notification
+- [ ] 36-03-PLAN.md — Register models in __init__.py + apply migration + verify schema
 
 #### Phase 37: Offline Training Script
 **Goal**: A runnable script produces a trained model artefact that the inference service can load — enabling AI recommendations backed by real sensor history.
