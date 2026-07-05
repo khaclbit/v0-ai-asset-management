@@ -1,923 +1,797 @@
-# IoT Integration Pitfalls
+# v2.2 Predictive Maintenance & SSE Notifications — Integration Pitfalls
 
-**Domain:** AI-Powered Asset Management System — v2.1 IoT Pipeline & Real-Time Data  
-**Milestone:** v2.1 — MQTT pipeline + WebSocket broadcasting added to existing FastAPI app  
+**Domain:** AI-Powered Asset Management System — v2.2 AI Inference + SSE  
+**Milestone:** v2.2 — Scikit-learn inference + SSE notifications added to existing FastAPI + sync SQLAlchemy + aiomqtt app  
 **Researched:** 2026-07-05  
-**Confidence:** HIGH — grounded in the actual v2.0 codebase (sync SQLAlchemy, psycopg2-binary, sync router endpoints)
+**Confidence:** HIGH — grounded in actual v2.1 codebase (consumer.py, websocket_manager.py, database.py, main.py)
 
-> **Scope:** These pitfalls are specific to **adding** aiomqtt + WebSocket to the existing FastAPI app.
-> They are not generic MQTT pitfalls — they are integration traps created by the specific v2.0 baseline.
+> **Scope:** Pitfalls specific to **adding** sklearn inference + SSE + threshold alerting to the v2.1 baseline.  
+> Each pitfall references the actual file/pattern it affects. Not generic ML or SSE advice.
 
 ---
 
-## Pre-Flight: Critical Baseline Reality Check
+## Baseline Reality Check (v2.1 → v2.2)
 
-Before any v2.1 code is written, audit these facts about the v2.0 baseline:
-
-| Fact | v2.0 Reality | v2.1 Implication |
+| Fact | v2.1 Reality | v2.2 Implication |
 |------|-------------|-----------------|
-| SQLAlchemy engine | **Sync** `create_engine` + `Session` | MQTT callbacks cannot call `get_db()` directly from async context without blocking the event loop |
-| DB driver | **psycopg2-binary** (sync, C-based) | Not compatible with `asyncio` — blocks event loop if called without thread executor |
-| Router endpoints | **`def`** (sync) — FastAPI runs them in a thread pool | Existing pattern works; MQTT handler needs a different approach |
-| Connection pool | `pool_size=10, max_overflow=20` | Pool sized for HTTP requests only; MQTT adds concurrent write pressure |
-| lifespan | Empty `yield` in `asynccontextmanager` | aiomqtt consumer must be launched here — not as a per-request BackgroundTask |
+| SQLAlchemy | Sync `create_engine` + `Session`, `asyncio.to_thread()` bridge | Alert DB writes must follow same `to_thread()` pattern — NOT a second direct call |
+| Event loop | Single-threaded asyncio; `_process_message` runs as `asyncio.create_task()` | Inference in MQTT task blocks event loop unless wrapped in `to_thread` |
+| ConnectionManager | `dict[str, set[WebSocket]]` + `asyncio.Lock`, snapshot pattern | SSE manager must follow the same snapshot-before-iterate design |
+| `_write_to_db` | Closes session in `finally` block; raises on error | Alert write function must mirror this — close-in-finally, rollback on error |
+| Lifespan | Cancels MQTT task + calls `close_all()` on shutdown | SSE registry cleanup must also hook into lifespan shutdown |
 
 ---
 
-## MQTT + SQLAlchemy Async Pitfalls
+## Section 1: Scikit-learn Model Loading & Inference in FastAPI
 
-### 🔴 CRITICAL — MQTT-1: Calling Sync SQLAlchemy Session from Async MQTT Handler Blocks Event Loop
+### 🔴 CRITICAL — AI-1: Calling `model.predict()` Inside `async def` Endpoint Without Thread Offload Blocks the Event Loop
 
-**What goes wrong:** aiomqtt delivers MQTT messages to an `async for message in client.messages` loop running inside
-the FastAPI event loop. If the message handler calls `get_db()` directly and executes a `db.add()` / `db.commit()`
-using the existing sync `Session` + psycopg2, the sync I/O call **blocks the entire event loop**. All WebSocket
-broadcasts, HTTP requests, and MQTT ACKs queue behind the database write. Under 10 sensors × 5 readings/min, the
-event loop is blocked for ~50ms per cycle — enough to cause visible WebSocket stutter and MQTT message backlog.
+**What goes wrong:**  
+`model.predict()` in scikit-learn invokes NumPy array operations that are CPU-bound and hold the Python GIL during parts of the call. Inside an `async def` FastAPI endpoint, any blocking call longer than ~1ms starves other coroutines. A Random Forest `predict()` on a 100-feature vector takes 5–30ms depending on n_estimators. With 10 concurrent requests, the event loop stalls for up to 300ms total — WebSocket broadcasts queue up, SSE heartbeats miss their window, and MQTT ACKs delay.
 
-**Warning sign:** Message handler looks like this:
-```python
-async for message in client.messages:
-    db = SessionLocal()          # WRONG — blocks event loop
-    reading = SensorReading(...)
-    db.add(reading)
-    db.commit()                  # BLOCKS — psycopg2 is sync
-    db.close()
-```
+**Why it happens:**  
+Developers see that numpy releases the GIL for some operations and assume `predict()` is async-safe. But the Python-level orchestration (tree traversal loop, output array construction) does NOT release the GIL throughout. Even if GIL were fully released, the call still monopolizes the current coroutine slot.
 
-**Detection during dev:** `uvicorn` logs show >100ms response times for `/ws` WebSocket pings during active MQTT publishing. `asyncio.get_event_loop().is_running()` check inside the handler returns True, confirming the async context.
-
-**Prevention:** Two valid options:
-1. **Thread executor (keeps existing sync SQLAlchemy):**
+**How to avoid:**  
+In any `async def` endpoint, wrap inference in `asyncio.to_thread()`:
 ```python
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+import numpy as np
 
-_thread_pool = ThreadPoolExecutor(max_workers=4)
+async def predict_maintenance(asset_id: str, db: Session = Depends(get_db)):
+    features = await asyncio.to_thread(_build_feature_vector, asset_id, db)
+    # ✅ correct — predict() runs in thread pool, event loop stays free
+    result = await asyncio.to_thread(_model.predict, features)
+    return {"prediction": result[0]}
+```
+In a `def` (sync) endpoint, FastAPI already runs it in a thread pool — no `to_thread()` needed.  
+**Recommendation:** Use `def` (sync) for the inference endpoint since all dependencies are sync anyway.
 
-async def handle_message(payload: dict):
-    def _write():
-        db = SessionLocal()
-        try:
-            db.add(SensorReading(**payload))
-            db.commit()
-        finally:
-            db.close()
-    await asyncio.get_event_loop().run_in_executor(_thread_pool, _write)
-```
-2. **Migrate database.py to async SQLAlchemy** (recommended for v2.1+):
-```python
-# database.py — async version
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-engine = create_async_engine("postgresql+asyncpg://...", pool_size=10)
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
-```
-⚠️ Option 2 requires changing all existing `def` routers to `async def` and replacing `Session` with `AsyncSession` — a larger refactor. For v2.1, Option 1 is the safer incremental approach.
+**Warning signs:**  
+- `async def` inference endpoint in router  
+- `model.predict(X)` called directly without `await asyncio.to_thread(...)`  
+- Uvicorn logs showing >50ms for `/api/v1/ai/predict` under modest load
+
+**Phase to address:** AI inference endpoint creation phase (first AI phase)
 
 ---
 
-### 🔴 CRITICAL — MQTT-2: aiomqtt Consumer Launched as Per-Request BackgroundTask
+### 🔴 CRITICAL — AI-2: Loading the `.pkl` File Inside the Endpoint Function on Every Request
 
-**What goes wrong:** A `BackgroundTasks` task in FastAPI is **per-request** — it runs after the response is sent
-for one HTTP request and then terminates. If the MQTT consumer is started via:
+**What goes wrong:**  
+`joblib.load("model.pkl")` on every request is a disk I/O call that takes 50–500ms (model size-dependent). Under concurrent requests, this multiplies linearly and exhausts the thread pool. The model is also never shared — each request deserializes its own independent copy, wasting memory.
+
+**Why it happens:**  
+Developers put model loading close to usage to avoid global state, then forget it's idempotent and expensive.
+
+**How to avoid:**  
+Load the model **once** at application startup, store as a module-level or app-state singleton:
 ```python
-@app.get("/start-mqtt")
-async def start_mqtt(background_tasks: BackgroundTasks):
-    background_tasks.add_task(mqtt_consumer)  # WRONG
+# app/ml/model.py
+import joblib
+from pathlib import Path
+
+_model = None  # module-level singleton
+
+def load_model(path: str = "models/predictive_maintenance.pkl") -> None:
+    global _model
+    _model = joblib.load(Path(path))
+
+def get_model():
+    if _model is None:
+        raise RuntimeError("Model not loaded — call load_model() at startup")
+    return _model
 ```
-…it only runs for the duration of that request's lifecycle. The consumer exits, no more messages are consumed,
-and the system silently drops all subsequent sensor readings.
-
-**Warning sign:** MQTT consumer starts successfully after hitting an endpoint, but stops receiving messages after 30–60 seconds. No error logs — it just stops.
-
-**Detection during dev:** Add `print("MQTT consumer exiting")` at the end of the consumer coroutine. If it prints, the consumer died.
-
-**Prevention:** Launch the MQTT consumer as a **lifespan task** — it must outlive all requests:
 ```python
-# main.py
+# main.py lifespan — load before yield
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task = asyncio.create_task(mqtt_consumer_task())  # starts with app
+    load_model()         # ← runs at startup, once
+    mqtt_task = asyncio.create_task(start_mqtt_consumer())
     yield
-    task.cancel()                                      # stops with app
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
-
-app = FastAPI(lifespan=lifespan)
+    mqtt_task.cancel()
+    ...
 ```
+
+**Warning signs:**  
+- `joblib.load(...)` inside a router function body  
+- `model = joblib.load(...)` at top of a router file (runs once per import — acceptable, but fragile under hot-reload)
+
+**Phase to address:** AI model loading wiring phase (same phase as inference endpoint)
 
 ---
 
-### 🔴 CRITICAL — MQTT-3: Connection Pool Exhaustion Under MQTT Write Load
+### 🟡 MODERATE — AI-3: Feature Vector Shape Mismatch Between Training and Inference Produces Silent Wrong Predictions
 
-**What goes wrong:** The v2.0 pool is configured as `pool_size=10, max_overflow=20` — designed for HTTP requests
-that hold a connection for <50ms. The MQTT consumer, if using `run_in_executor` with a thread pool, may hold
-connections longer (commit + close is ~5–20ms). Under sustained sensor load (10 sensors × 1 msg/5s = 2 inserts/sec),
-the pool handles it fine — but if the thread pool stalls (disk I/O, lock contention), connections accumulate.
-More dangerous: a bug that creates a `SessionLocal()` without `db.close()` in a finally block will leak
-connections permanently until the pool is exhausted and new requests fail with `QueuePool limit exceeded`.
+**What goes wrong:**  
+The offline training script produces a Random Forest trained on features `[temperature_avg, vibration_max, running_hours, power_avg, ...]` in a specific column order. The inference endpoint queries recent sensor readings and constructs a NumPy array. If the column order differs, or a feature is missing (NULL in DB → replaced with 0 or NaN), the model silently returns a wrong prediction. scikit-learn does not validate feature names at inference time unless `feature_names_in_` is explicitly checked.
 
-**Warning sign:** 
-- `sqlalchemy.exc.TimeoutError: QueuePool limit of size 10 overflow 20 reached` in logs
-- HTTP requests start failing with 500 while MQTT consumer keeps running
+**Why it happens:**  
+Training feature order is defined by a pandas `DataFrame.columns` order at training time. Inference builds a list manually. Any difference (alphabetical sort vs. insertion order, missing metric for a device) creates a silent mismatch.
 
-**Detection during dev:** Expose pool status in a debug endpoint:
+**How to avoid:**  
+1. Save feature names alongside the model in the pickle:
 ```python
-@app.get("/debug/pool")
-def pool_status():
-    return {"checked_out": engine.pool.checkedout(), "overflow": engine.pool.overflow()}
-```
-
-**Prevention:**
-- Always use `try/finally: db.close()` pattern — never rely on garbage collection for sessions
-- Keep the MQTT thread pool workers ≤ pool_size / 2 (max 5 workers for pool_size=10)
-- Add `pool_timeout=10` to `create_engine` to fail fast instead of hanging on pool exhaustion
-
----
-
-### 🟡 MODERATE — MQTT-4: aiomqtt Reconnect Loop Not Cancellable → Hangs on Shutdown
-
-**What goes wrong:** aiomqtt's recommended reconnect pattern uses a `while True` loop with `asyncio.sleep()`:
-```python
-async def mqtt_consumer_task():
-    while True:
-        try:
-            async with aiomqtt.Client("mosquitto") as client:
-                async for message in client.messages:
-                    await handle_message(message)
-        except aiomqtt.MqttError:
-            await asyncio.sleep(5)  # reconnect delay
-```
-When FastAPI shuts down and calls `task.cancel()`, the `CancelledError` is raised inside `asyncio.sleep()`.
-If the outer `while True` catches it with a bare `except Exception`, the task ignores cancellation and never exits.
-`uvicorn` then hangs for 5 seconds waiting for the task to finish.
-
-**Warning sign:** `docker compose stop api` takes >5 seconds. Logs show `Waiting for background tasks...`.
-
-**Prevention:** Catch `CancelledError` explicitly and re-raise it:
-```python
-async def mqtt_consumer_task():
-    while True:
-        try:
-            async with aiomqtt.Client("mosquitto") as client:
-                async for message in client.messages:
-                    await handle_message(message)
-        except asyncio.CancelledError:
-            raise          # let the task terminate cleanly
-        except aiomqtt.MqttError as e:
-            logger.warning(f"MQTT disconnected: {e}. Reconnecting in 5s...")
-            await asyncio.sleep(5)
-```
-
----
-
-### 🟡 MODERATE — MQTT-5: Session Created Outside Try/Finally → Connection Leak on Exception
-
-**What goes wrong:** When a malformed MQTT payload causes a `ValueError` during parsing, the SQLAlchemy session
-is never closed if the exception is raised before `db.close()`:
-```python
-def _write_to_db(payload_str: str):
-    db = SessionLocal()
-    data = json.loads(payload_str)    # can raise ValueError
-    reading = SensorReading(**data)   # can raise TypeError
-    db.add(reading)
-    db.commit()
-    db.close()  # NEVER REACHED if exception above
-```
-After enough bad payloads, the connection pool is exhausted.
-
-**Prevention:** Always use context manager or try/finally:
-```python
-def _write_to_db(payload_str: str):
-    db = SessionLocal()
-    try:
-        data = json.loads(payload_str)
-        db.add(SensorReading(**data))
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Failed to write sensor reading: {e}")
-    finally:
-        db.close()
-```
-
----
-
-## WebSocket Pitfalls
-
-### 🔴 CRITICAL — WS-1: ConnectionManager.broadcast() Raises on First Dead Connection, Silencing All Others
-
-**What goes wrong:** The standard ConnectionManager broadcast pattern iterates over active connections:
-```python
-async def broadcast(self, data: str):
-    for connection in self.active_connections:
-        await connection.send_text(data)  # RAISES if connection is dead
-```
-When a client disconnects ungracefully (browser tab closed, network drop), the `WebSocket` object stays in
-`active_connections` but `send_text()` raises `WebSocketDisconnect` or `RuntimeError`. The exception
-**stops the loop** — all connections after the dead one never receive the broadcast.
-
-**Warning sign:** Some clients stop receiving updates after another client disconnects. No explicit error for the working clients.
-
-**Detection during dev:** Open 3 browser tabs on the IoT monitoring page. Force-close one tab. Observe that the remaining tabs stop updating.
-
-**Prevention:** Wrap each send in try/except and collect disconnected clients for removal:
-```python
-async def broadcast(self, data: str):
-    dead = []
-    for connection in self.active_connections:
-        try:
-            await connection.send_text(data)
-        except Exception:
-            dead.append(connection)
-    for conn in dead:
-        self.active_connections.remove(conn)
-```
-
----
-
-### 🔴 CRITICAL — WS-2: active_connections List Has No asyncio.Lock → Race Condition on Concurrent Connect/Disconnect
-
-**What goes wrong:** `connect()`, `disconnect()`, and `broadcast()` all modify/read `active_connections` concurrently
-in the async event loop. While Python's GIL prevents data corruption, `list.remove()` during iteration in
-`broadcast()` raises `ValueError` if a disconnect happens mid-broadcast. Under high connection churn (users
-navigating between pages on the IoT Monitoring view), this creates intermittent `ValueError: list.remove(x): x not in list` errors.
-
-**Warning sign:** Occasional 500 errors in WebSocket disconnect logs, especially when multiple clients are active.
-
-**Prevention:** Protect the list with an `asyncio.Lock`:
-```python
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-        self._lock = asyncio.Lock()
-
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        async with self._lock:
-            self.active_connections.append(ws)
-
-    async def disconnect(self, ws: WebSocket):
-        async with self._lock:
-            self.active_connections.discard(ws)  # use a set, not a list
-
-    async def broadcast(self, data: str):
-        async with self._lock:
-            connections = list(self.active_connections)  # snapshot
-        # iterate snapshot outside lock
-        dead = []
-        for conn in connections:
-            try:
-                await conn.send_text(data)
-            except Exception:
-                dead.append(conn)
-        if dead:
-            async with self._lock:
-                for conn in dead:
-                    self.active_connections.discard(conn)
-```
-Use a `set` instead of a `list` for O(1) removal.
-
----
-
-### 🔴 CRITICAL — WS-3: MQTT Handler Calls broadcast() Across asyncio Task Boundary Without Safety
-
-**What goes wrong:** The MQTT consumer task and the WebSocket connections live in the same event loop, but they
-are different coroutines. If the MQTT consumer calls `connection_manager.broadcast()` directly from the thread
-executor (via `run_in_executor`), it calls an async method from a sync thread — this raises:
-`RuntimeError: no running event loop` or silently drops the call.
-
-**Warning sign:** Messages are written to the database correctly but WebSocket clients never receive updates.
-
-**Prevention:** Call `broadcast()` only from async context. When using `run_in_executor` for DB writes, keep
-the broadcast in the async caller:
-```python
-async def handle_message(payload: dict):
-    # DB write in thread (sync SQLAlchemy)
-    await asyncio.get_event_loop().run_in_executor(_thread_pool, _write_to_db, payload)
-    # Broadcast from async context
-    await connection_manager.broadcast(json.dumps(payload))
-```
-
----
-
-### 🟡 MODERATE — WS-4: WebSocket Endpoint Accepts Connections After App Shutdown
-
-**What goes wrong:** When uvicorn begins shutdown, the FastAPI lifespan context starts tearing down. But
-WebSocket connections that are already open remain open — uvicorn does not force-close them. New connections
-during the shutdown window are accepted, then immediately dropped when the server exits, leaving clients in
-a reconnect loop.
-
-**Prevention:** In the lifespan shutdown phase, close all active WebSocket connections before yielding:
-```python
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    task = asyncio.create_task(mqtt_consumer_task())
-    yield
-    # Shutdown
-    task.cancel()
-    await connection_manager.close_all()  # send close frame to all clients
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
-```
-
----
-
-### 🟡 MODERATE — WS-5: Next.js useEffect Creates Two Connections in React StrictMode
-
-**What goes wrong:** Next.js 15 uses React 18+ StrictMode by default, which **double-invokes `useEffect`**
-in development to detect side-effects. A WebSocket connection opened in `useEffect` is opened twice — the
-first instance is never cleaned up because the cleanup function only closes the second instance:
-```tsx
-useEffect(() => {
-  const ws = new WebSocket("ws://localhost:8000/ws/sensors");
-  ws.onmessage = (e) => setReadings(JSON.parse(e.data));
-  // No cleanup — both connections stay open
-}, []);
-```
-This causes two identical streams of sensor data, double-rendering chart updates, and leaves zombie
-connections on the server.
-
-**Warning sign:** Server logs show 2 WebSocket connections per browser tab in development. Chart updates
-flicker or stutter.
-
-**Detection during dev:** Add `console.log("WS open")` in the `onopen` handler — you'll see it logged twice per mount.
-
-**Prevention:** Always return a cleanup function:
-```tsx
-useEffect(() => {
-  const ws = new WebSocket("ws://localhost:8000/ws/sensors");
-  ws.onmessage = (e) => setReadings(JSON.parse(e.data));
-  return () => {
-    ws.close();  // cleanup closes the connection on unmount/StrictMode re-run
-  };
-}, []); // empty deps = connect once on mount
-```
-
----
-
-### 🟡 MODERATE — WS-6: No Reconnect Logic in Next.js Client → Permanent Disconnect After Brief Outage
-
-**What goes wrong:** If the FastAPI server restarts (e.g., hot reload from `--reload` flag in dev, or Docker
-restart), the WebSocket connection drops. Without reconnect logic, the IoT Monitoring page shows stale/frozen
-data permanently — the user has to manually refresh the page.
-
-**Warning sign:** After `docker compose restart api`, the IoT Monitoring charts stop updating until page reload.
-
-**Prevention:** Add exponential backoff reconnect:
-```tsx
-function useReconnectingWebSocket(url: string) {
-  const wsRef = useRef<WebSocket | null>(null);
-  const retryDelay = useRef(1000);
-
-  const connect = useCallback(() => {
-    const ws = new WebSocket(url);
-    ws.onopen = () => { retryDelay.current = 1000; }; // reset on success
-    ws.onclose = () => {
-      setTimeout(() => {
-        retryDelay.current = Math.min(retryDelay.current * 2, 30000);
-        connect();
-      }, retryDelay.current);
-    };
-    wsRef.current = ws;
-    return ws;
-  }, [url]);
-
-  useEffect(() => {
-    const ws = connect();
-    return () => ws.close();
-  }, [connect]);
-
-  return wsRef;
+# training script
+model_artifact = {
+    "model": rf_model,
+    "feature_names": list(X_train.columns),  # ← canonical order
+    "trained_at": datetime.utcnow().isoformat(),
 }
+joblib.dump(model_artifact, "models/predictive_maintenance.pkl")
 ```
-
----
-
-### 🟢 MINOR — WS-7: Unbounded Reading History in React State → Memory Leak
-
-**What goes wrong:** Each WebSocket message appends to a React state array:
-```tsx
-const [readings, setReadings] = useState<Reading[]>([]);
-ws.onmessage = (e) => setReadings(prev => [...prev, JSON.parse(e.data)]);
-```
-After 1 hour at 2 messages/second = 7,200 readings in state. Recharts re-renders all 7,200 points.
-Memory grows unbounded; the tab becomes sluggish after ~30 minutes.
-
-**Prevention:** Cap to a rolling window:
-```tsx
-ws.onmessage = (e) => setReadings(prev => {
-  const next = [...prev, JSON.parse(e.data)];
-  return next.slice(-100); // keep last 100 readings per sensor
-});
-```
-
----
-
-## Database Performance Pitfalls
-
-### 🔴 CRITICAL — DB-1: Missing Composite Index on (asset_id, recorded_at) → Slow Time-Range Queries
-
-**What goes wrong:** The IoT Monitoring page queries the last N readings for a specific asset:
-```sql
-SELECT * FROM sensor_readings
-WHERE asset_id = 'ASSET-001'
-ORDER BY recorded_at DESC
-LIMIT 50;
-```
-Without a composite index, this requires a **full table scan** on `sensor_readings`. At 10 sensors × 12
-readings/hour × 100 assets = 12,000 rows/hour, after one week = 2M rows. Query time degrades from
-<1ms to >500ms. Dashboard latency becomes noticeable within the first week of dev testing.
-
-**Warning sign:** The Alembic migration creates the `sensor_readings` table with only a primary key index.
-`EXPLAIN ANALYZE` shows `Seq Scan` on `sensor_readings`.
-
-**Detection during dev:**
-```sql
-EXPLAIN ANALYZE
-SELECT * FROM sensor_readings WHERE asset_id = 'ASSET-001'
-ORDER BY recorded_at DESC LIMIT 50;
-```
-Look for `Seq Scan` — means the index is missing.
-
-**Prevention:** Add in the Alembic migration:
+2. At inference, validate and reorder:
 ```python
-# In alembic migration
-op.create_index(
-    "ix_sensor_readings_asset_recorded",
-    "sensor_readings",
-    ["asset_id", "recorded_at"],
-)
-# Also a standalone index on recorded_at for global time-range queries
-op.create_index(
-    "ix_sensor_readings_recorded_at",
-    "sensor_readings",
-    ["recorded_at"],
-)
+def build_feature_vector(readings: dict, feature_names: list[str]) -> np.ndarray:
+    row = [readings.get(f, 0.0) for f in feature_names]  # order enforced by saved names
+    return np.array(row).reshape(1, -1)
 ```
+
+**Warning signs:**  
+- `joblib.load()` returns a bare `RandomForestClassifier` (not a dict with feature_names)  
+- Inference code does `np.array([temp, vib, hours, power])` with hardcoded order  
+- Predictions are always the same class regardless of input values
+
+**Phase to address:** Training script + model artifact design phase
 
 ---
 
-### 🔴 CRITICAL — DB-2: Unbounded sensor_readings Growth → Disk Fills, Queries Slow
+### 🟡 MODERATE — AI-4: Model File Missing at Startup Causes Silent `None` or Crash at First Request
 
-**What goes wrong:** The table grows indefinitely. At 10 sensors × 2 readings/min × 100 assets = 2,000
-rows/min = 2.88M rows/day. A Docker volume on a dev laptop fills up within days. No production-viable
-system would let sensor data grow indefinitely, but for v2.1 the dev environment needs a retention policy
-or the Docker PostgreSQL volume becomes a problem within 1–2 days of active development.
+**What goes wrong:**  
+If `models/predictive_maintenance.pkl` doesn't exist when `load_model()` runs at startup (e.g., first deploy before training, path wrong in Docker), and the code silently sets `_model = None`, every inference request returns a 500 error with no useful message. Alternatively, if `load_model()` raises and the exception is swallowed, the app starts but the AI feature is broken.
 
-**Warning sign:** `docker system df` shows the postgres_data volume growing rapidly. `pg_database_size()`
-increases by hundreds of MB per hour.
-
-**Prevention:** Add a scheduled cleanup or a simple `LIMIT 10,000` retention as part of the Alembic
-migration or seed setup:
-```sql
--- Run periodically (can be a FastAPI scheduled task or manual):
-DELETE FROM sensor_readings
-WHERE recorded_at < NOW() - INTERVAL '7 days';
-```
-For dev: set simulator publish interval to 10–30 seconds (not 1 second) to control row growth rate.
-
----
-
-### 🟡 MODERATE — DB-3: No Index on sensor_type → Slow Filtering by Sensor Category
-
-**What goes wrong:** The IoT Monitoring page filters readings by sensor type (temperature, vibration, power).
-Without an index on `sensor_type`, these filters also require full table scans:
-```sql
-SELECT * FROM sensor_readings WHERE asset_id = ? AND sensor_type = 'temperature'
-ORDER BY recorded_at DESC LIMIT 100;
-```
-
-**Prevention:** Add to the Alembic migration:
+**How to avoid:**  
+Validate at startup explicitly:
 ```python
-op.create_index(
-    "ix_sensor_readings_type",
-    "sensor_readings",
-    ["asset_id", "sensor_type", "recorded_at"],  # covering index
-)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    model_path = Path(settings.MODEL_PATH)
+    if not model_path.exists():
+        logger.warning("Model file not found at %s — AI features disabled", model_path)
+        # app still starts, but /ai/predict returns 503 with clear message
+    else:
+        load_model(str(model_path))
+    ...
 ```
+Add a health-check endpoint that reports model loaded status separately from DB health.
+
+**Warning signs:**  
+- No model-existence check before `joblib.load()`  
+- `/api/v1/health` returns `{"status": "ok"}` but model is None  
+- First request to inference endpoint returns 500 with `NoneType has no attribute predict`
+
+**Phase to address:** AI inference endpoint creation phase (startup wiring)
 
 ---
 
-### 🟡 MODERATE — DB-4: INSERT-Per-Message at High Frequency → Write Amplification
+### 🟢 MINOR — AI-5: `joblib.load()` in a Thread Pool with the Same File Path Is Thread-Safe for Reading, But Concurrent Loads Waste Memory
 
-**What goes wrong:** At 2 readings/second with 5 sensors, that is 10 individual `INSERT` statements per
-second. Each INSERT is a separate transaction with a full WAL write. PostgreSQL handles this fine for dev
-(it can sustain thousands of TPS), but it is inefficient and causes unnecessary lock contention under load.
-More importantly, each INSERT is also triggering a WebSocket broadcast — if the broadcast takes >50ms
-(which it can at high WebSocket client counts), the insert queue backs up.
+**What goes wrong:**  
+If multiple requests race to call `load_model()` before the first one completes (possible if load is triggered lazily), multiple copies of the model are loaded into memory. A Random Forest with 100 estimators × 50 features can be 50–200MB. Three concurrent lazy loads = 150–600MB spike.
 
-**Warning sign:** MQTT handler processes messages synchronously. No batching.
-
-**Prevention:** For v2.1 dev scale, single inserts are acceptable. Add a note in the code:
+**How to avoid:**  
+Load once at lifespan startup (see AI-2). If lazy loading is needed, use `threading.Lock()` (not asyncio.Lock) since `joblib.load()` runs in a thread:
 ```python
-# NOTE: Single-row INSERTs are acceptable at dev scale (≤10 sensors, 5s intervals).
-# For production scale, use batch INSERT with asyncio.Queue accumulator + 1s flush interval.
+_load_lock = threading.Lock()
+
+def ensure_model_loaded():
+    global _model
+    if _model is not None:
+        return
+    with _load_lock:
+        if _model is None:  # double-checked locking
+            _model = joblib.load(settings.MODEL_PATH)
 ```
-Simulator should publish at 5–10 second intervals (not 1 second) to avoid this becoming a problem.
+
+**Phase to address:** AI model loading wiring phase
 
 ---
 
-### 🟡 MODERATE — DB-5: `SELECT *` from sensor_readings → Unnecessary Column Fetch
+## Section 2: SSE Notifications via FastAPI StreamingResponse + asyncio.Queue
 
-**What goes wrong:** The WebSocket broadcast serializes full `SensorReading` ORM objects. If the model
-has many columns (raw_payload JSON, metadata fields, etc.), `SELECT *` fetches all of them even if
-the WebSocket payload only needs `asset_id`, `sensor_type`, `value`, `unit`, `recorded_at`.
+### 🔴 CRITICAL — SSE-1: SSE Queue Registry Leak — Disconnected Clients Leave Queues in Memory Forever
 
-**Prevention:** Use targeted queries in the WebSocket broadcast path:
+**What goes wrong:**  
+The SSE endpoint creates an `asyncio.Queue` per connection and registers it in a module-level dict (e.g., `_sse_queues: dict[str, asyncio.Queue]`). When the client disconnects (browser tab closed, network drop, page navigation), the generator in `StreamingResponse` may not detect the disconnect immediately. If the cleanup code is in a `finally` block that only runs when the generator is fully consumed (never, for SSE), the queue stays in the registry. Over hours, the registry accumulates dead queues and their unread items, leaking memory.
+
+**Why it happens:**  
+SSE `StreamingResponse` uses an async generator. The generator runs until it either returns or raises. Client disconnect does NOT automatically cancel the generator in older FastAPI/Starlette versions — the generator keeps blocking on `queue.get()` indefinitely.
+
+**How to avoid:**  
+Use `asyncio.wait_for()` with a timeout inside the generator loop to periodically check if the client is alive, and handle `asyncio.CancelledError` which Starlette raises when the client disconnects:
 ```python
-from sqlalchemy import select
-result = db.execute(
-    select(
-        SensorReading.asset_id,
-        SensorReading.sensor_type,
-        SensorReading.value,
-        SensorReading.unit,
-        SensorReading.recorded_at,
-    )
-    .where(SensorReading.asset_id == asset_id)
-    .order_by(SensorReading.recorded_at.desc())
-    .limit(50)
-)
-```
-
----
-
-## Docker/Mosquitto Pitfalls
-
-### 🔴 CRITICAL — DOCKER-1: Mosquitto 2.x Requires Explicit Listener Config — Silent Connection Refused
-
-**What goes wrong:** Mosquitto 2.x changed the default configuration: **anonymous connections and default
-listeners are disabled by default**. An `eclipse-mosquitto:2` container with no config file starts
-successfully (no error in container logs), but all connection attempts are refused with:
-`Connection refused: not authorised` or `Connection refused: error`. The aiomqtt client and simulator
-both fail silently (or log a cryptic `[Errno 111] Connection refused`). The developer spends time
-debugging the Python code when the issue is in the broker config.
-
-**Warning sign:** `docker compose up` shows Mosquitto container as `Up (healthy)` but aiomqtt client
-logs `Connection refused` or never connects.
-
-**Detection:** 
-```bash
-docker exec mosquitto mosquitto_pub -h localhost -t test -m "hello"
-# If this fails with "Connection Refused", the config is wrong
-```
-
-**Prevention:** Mount a `mosquitto.conf` in Docker Compose:
-```yaml
-# docker-compose.yml
-mosquitto:
-  image: eclipse-mosquitto:2
-  volumes:
-    - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
-  ports:
-    - "1883:1883"
-```
-```ini
-# mosquitto/config/mosquitto.conf
-listener 1883
-allow_anonymous true
-```
-Without `listener 1883`, Mosquitto 2.x binds to localhost only (not accessible from other containers).
-Without `allow_anonymous true`, all connections are refused.
-
----
-
-### 🔴 CRITICAL — DOCKER-2: FastAPI API Container Starts Before Mosquitto Is Ready
-
-**What goes wrong:** Docker Compose `depends_on` only guarantees container **start order**, not **readiness**.
-The `api` container starts, the lifespan function launches the `mqtt_consumer_task()`, which immediately
-tries to connect to `mosquitto:1883` — but Mosquitto hasn't finished binding its port yet. aiomqtt raises
-`MqttError: Connection refused`. The consumer task exits (or enters the reconnect loop), and if the reconnect
-logic isn't robust, sensor data is never consumed.
-
-**Warning sign:** First 5–10 seconds of `docker compose up` show `MQTT connection refused` errors in the
-api service logs.
-
-**Prevention:**
-1. Add a Mosquitto healthcheck to Docker Compose:
-```yaml
-mosquitto:
-  image: eclipse-mosquitto:2
-  healthcheck:
-    test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "healthcheck", "-m", "ping", "-q"]
-    interval: 5s
-    timeout: 3s
-    retries: 5
-```
-2. Add `depends_on: mosquitto: condition: service_healthy` to the `api` service.
-3. **Also** implement reconnect with backoff in the MQTT consumer (healthcheck alone is not enough for transient post-startup disconnects):
-```python
-async def mqtt_consumer_task():
-    while True:
-        try:
-            async with aiomqtt.Client("mosquitto", port=1883) as client:
-                await client.subscribe("assets/+/sensors/+")
-                async for message in client.messages:
-                    await handle_message(message)
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            logger.warning(f"MQTT consumer error: {e}. Retrying in 5s...")
-            await asyncio.sleep(5)
-```
-
----
-
-### 🟡 MODERATE — DOCKER-3: Mosquitto Config Volume Not Mounted → Default Config Used Silently
-
-**What goes wrong:** A common mistake when first adding Mosquitto to Docker Compose is specifying the
-volume path incorrectly. The container starts with the default empty config, Mosquitto 2.x refuses all
-connections, and the error is `Connection Refused` rather than `File not found` — making it appear to
-be a network issue.
-
-**Warning sign:** `docker exec mosquitto cat /mosquitto/config/mosquitto.conf` returns empty or
-`No such file or directory`.
-
-**Prevention:** Verify the volume mount after first `docker compose up`:
-```bash
-docker exec mosquitto cat /mosquitto/config/mosquitto.conf
-# Should show: listener 1883 / allow_anonymous true
-```
-
----
-
-### 🟡 MODERATE — DOCKER-4: Simulator Depends On Both Mosquitto AND API — Wrong depends_on Order
-
-**What goes wrong:** The Python sensor simulator publishes to Mosquitto directly (not via the FastAPI API).
-If it is configured with `depends_on: [api]`, it waits for the api but not necessarily for Mosquitto.
-If it is configured with `depends_on: [mosquitto]`, it starts as soon as the Mosquitto container starts —
-before Mosquitto is ready to accept connections. The simulator's first batch of publishes is lost.
-
-**Prevention:** Simulator should depend on Mosquitto's healthcheck, not just its startup:
-```yaml
-simulator:
-  depends_on:
-    mosquitto:
-      condition: service_healthy
-```
-Add a retry loop in the simulator's publish logic (same pattern as the API consumer).
-
----
-
-### 🟢 MINOR — DOCKER-5: No Persistent Volume for Mosquitto → In-Flight Messages Lost on Restart
-
-**What goes wrong:** Without a persistence volume, Mosquitto stores QoS 1 retained messages in memory only.
-If the broker container restarts, all queued messages and retained state are lost. For a dev environment
-this is acceptable, but it's a footgun if the team assumes QoS 1 guarantees delivery across restarts.
-
-**Prevention:** For v2.1 dev, this is acceptable — document it:
-```yaml
-# docker-compose.yml comment:
-# mosquitto has no persistent volume — QoS 1 retained messages are lost on broker restart.
-# Acceptable for v2.1 dev environment. Add mosquitto_data volume for production.
-```
-
----
-
-## Prevention Strategies
-
-### Strategy A: Use `run_in_executor` for All DB Writes in MQTT Handler
-
-Keep the existing sync SQLAlchemy and psycopg2 stack. Offload blocking writes to a thread pool:
-
-```python
-# app/services/mqtt_handler.py
-import asyncio
-import json
-import logging
-from concurrent.futures import ThreadPoolExecutor
-
-from app.database import SessionLocal
-from app.models.sensor_reading import SensorReading
-
-logger = logging.getLogger(__name__)
-_db_thread_pool = ThreadPoolExecutor(max_workers=4)
-
-
-def _persist_reading(payload: dict) -> SensorReading | None:
-    """Runs in thread pool — safe to use sync SQLAlchemy here."""
-    db = SessionLocal()
+async def sse_event_generator(user_id: str):
+    queue: asyncio.Queue = asyncio.Queue(maxsize=50)
+    sse_manager.register(user_id, queue)
     try:
-        reading = SensorReading(
-            asset_id=payload["asset_id"],
-            sensor_type=payload["sensor_type"],
-            value=float(payload["value"]),
-            unit=payload.get("unit", ""),
-        )
-        db.add(reading)
-        db.commit()
-        db.refresh(reading)
-        return reading
-    except Exception as e:
-        db.rollback()
-        logger.error(f"DB write failed: {e}")
-        return None
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=15.0)
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"  # SSE comment — prevents proxy timeout
+    except asyncio.CancelledError:
+        pass  # Client disconnected — Starlette cancels the generator
     finally:
-        db.close()
-
-
-async def handle_mqtt_message(message) -> dict | None:
-    """Called from async MQTT consumer — dispatches DB write to thread pool."""
-    try:
-        payload = json.loads(message.payload)
-    except (json.JSONDecodeError, UnicodeDecodeError) as e:
-        logger.warning(f"Malformed MQTT payload on {message.topic}: {e}")
-        return None
-
-    loop = asyncio.get_event_loop()
-    reading = await loop.run_in_executor(_db_thread_pool, _persist_reading, payload)
-    return payload if reading else None
+        sse_manager.unregister(user_id, queue)  # ✅ always runs, even on CancelledError
 ```
+
+**Warning signs:**  
+- No `finally: sse_manager.unregister(...)` in the SSE generator  
+- Queue registry dict grows over time (log its size periodically)  
+- Memory usage creeps up after many browser tab open/close cycles
+
+**Phase to address:** SSE notification manager phase (the phase that adds SSE infrastructure)
 
 ---
 
-### Strategy B: Safe ConnectionManager Pattern
+### 🔴 CRITICAL — SSE-2: One Queue Per User vs. One Queue Per Connection — Multiple Browser Tabs Get Stale/Missed Events
 
+**What goes wrong:**  
+If the registry is `dict[user_id, asyncio.Queue]`, a user with two open browser tabs creates two SSE connections. The second connection overwrites the first user's queue in the registry. The first tab's generator is now abandoned — it blocks forever on a queue that never gets events. Events go only to the latest tab; the first tab freezes silently.
+
+**Why it happens:**  
+The ConnectionManager design (keyed by device_id) works for WebSocket because multiple subscribers to the same device all receive the same broadcast. SSE events are per-user-per-session but the dict is keyed by user_id, not connection_id.
+
+**How to avoid:**  
+Key the registry by connection UUID, not user_id. Map user_id to a SET of queues:
 ```python
-# app/services/connection_manager.py
-import asyncio
-import json
-from fastapi import WebSocket
-
-class ConnectionManager:
+class SSEManager:
     def __init__(self):
-        self._connections: set[WebSocket] = set()
+        self._user_queues: dict[str, set[asyncio.Queue]] = {}
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
+    async def register(self, user_id: str, queue: asyncio.Queue):
         async with self._lock:
-            self._connections.add(websocket)
+            self._user_queues.setdefault(user_id, set()).add(queue)
 
-    async def disconnect(self, websocket: WebSocket):
+    async def unregister(self, user_id: str, queue: asyncio.Queue):
         async with self._lock:
-            self._connections.discard(websocket)
+            self._user_queues.get(user_id, set()).discard(queue)
 
-    async def broadcast_json(self, data: dict):
+    async def notify(self, user_id: str, event: dict):
         async with self._lock:
-            snapshot = set(self._connections)
-        dead: set[WebSocket] = set()
-        for conn in snapshot:
+            targets = self._user_queues.get(user_id, set()).copy()  # snapshot!
+        for q in targets:
             try:
-                await conn.send_text(json.dumps(data, default=str))
-            except Exception:
-                dead.add(conn)
-        if dead:
-            async with self._lock:
-                self._connections -= dead
-
-    async def close_all(self):
-        async with self._lock:
-            snapshot = set(self._connections)
-        for conn in snapshot:
-            try:
-                await conn.close()
-            except Exception:
-                pass
-        async with self._lock:
-            self._connections.clear()
+                q.put_nowait(event)
+            except asyncio.QueueFull:
+                pass  # slow/dead consumer — drop, don't block
 ```
+This mirrors the ConnectionManager snapshot-before-iterate pattern that v2.1 already established.
+
+**Warning signs:**  
+- `_sse_queues: dict[str, asyncio.Queue]` (single queue per user)  
+- Second browser tab SSE connection immediately stops receiving events  
+- No SET of queues per user
+
+**Phase to address:** SSE notification manager phase
 
 ---
 
-### Strategy C: Alembic Migration Index Checklist
+### 🔴 CRITICAL — SSE-3: `asyncio.Lock` Held During `queue.put_nowait()` in `notify()` Blocks MQTT Consumer
 
-In the `sensor_readings` migration, always include:
+**What goes wrong:**  
+If the SSE manager's `notify()` method holds `self._lock` while calling `queue.put_nowait()` on each target queue, and if any target queue is full (maxsize reached, consumer is slow), `put_nowait()` raises `QueueFull` — which is fine. But if the code uses `await queue.put()` instead of `put_nowait()`, it suspends inside the lock. Another coroutine trying to `register()` or `unregister()` deadlocks waiting for the lock. The MQTT consumer task that calls `notify()` stalls, causing MQTT message processing to back up.
 
+**Why it happens:**  
+Copy-pasting the ConnectionManager lock pattern without recognizing that `ws.send_text()` is awaited OUTSIDE the lock (snapshot pattern), but `queue.put()` might be naively kept inside.
+
+**How to avoid:**  
+Always snapshot the target set under the lock, release the lock, then call `put_nowait()` outside:
 ```python
-def upgrade() -> None:
-    op.create_table(
-        "sensor_readings",
-        sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("asset_id", sa.String(50), sa.ForeignKey("assets.id"), nullable=False),
-        sa.Column("sensor_type", sa.String(50), nullable=False),
-        sa.Column("value", sa.Float(), nullable=False),
-        sa.Column("unit", sa.String(20), nullable=True),
-        sa.Column("recorded_at", sa.DateTime(timezone=True),
-                  server_default=sa.func.now(), nullable=False),
-    )
-    # Index 1: per-asset time-series queries (most common)
-    op.create_index("ix_sensor_readings_asset_recorded",
-                    "sensor_readings", ["asset_id", "recorded_at"])
-    # Index 2: per-asset per-type time-series (for sensor type filtering)
-    op.create_index("ix_sensor_readings_asset_type_recorded",
-                    "sensor_readings", ["asset_id", "sensor_type", "recorded_at"])
-    # Index 3: global time-range queries (retention cleanup)
-    op.create_index("ix_sensor_readings_recorded_at",
-                    "sensor_readings", ["recorded_at"])
+async def notify(self, user_id: str, event: dict):
+    async with self._lock:
+        targets = self._user_queues.get(user_id, set()).copy()  # snapshot, then release lock
+    for q in targets:  # ← lock NOT held here
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            pass
 ```
+
+**Warning signs:**  
+- `await queue.put(event)` inside an `async with self._lock` block  
+- MQTT consumer log shows increasing processing lag after SSE connections are added  
+- `asyncio.Lock` acquire timeout warnings in logs
+
+**Phase to address:** SSE notification manager phase — MUST verify lock-release-before-notify in code review
 
 ---
 
-### Strategy D: Mosquitto Docker Compose Checklist
+### 🟡 MODERATE — SSE-4: Unbounded Queue Size Causes Memory Explosion When Client Is Slow or Disconnected
 
-```yaml
-# docker-compose.yml additions
-mosquitto:
-  image: eclipse-mosquitto:2
-  restart: unless-stopped
-  ports:
-    - "1883:1883"
-  volumes:
-    - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-  healthcheck:
-    test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "healthcheck", "-m", "ping", "-q"]
-    interval: 5s
-    timeout: 3s
-    retries: 5
-    start_period: 5s
+**What goes wrong:**  
+`asyncio.Queue()` with no `maxsize` is unbounded. If an SSE client's network is slow (e.g., mobile on 2G) or if the client disconnects but the queue is not yet cleaned up (see SSE-1), events from MQTT threshold alerts pile up without bound. 100 alerts/second × 1KB/alert × 60 seconds = 6MB of queued events per zombie connection.
 
-api:
-  depends_on:
-    db:
-      condition: service_healthy
-    mosquitto:               # ADD THIS
-      condition: service_healthy
-
-simulator:
-  depends_on:
-    mosquitto:
-      condition: service_healthy
+**How to avoid:**  
+Always set `maxsize`:
+```python
+queue: asyncio.Queue = asyncio.Queue(maxsize=100)
 ```
+Use `put_nowait()` in the notifier and catch `QueueFull` to drop events for overwhelmed consumers. This is a drop-on-full strategy — acceptable for notifications (missing an alert is better than crashing).
 
-```ini
-# mosquitto/config/mosquitto.conf
-listener 1883
-allow_anonymous true
-# persistence false  # acceptable for dev
-# log_type all       # enable for debugging connection issues
-```
+**Warning signs:**  
+- `asyncio.Queue()` with no `maxsize` argument  
+- RSS memory grows linearly with SSE connection age  
+- `queue.qsize()` exceeds 1000 for any single connection
+
+**Phase to address:** SSE notification manager phase
 
 ---
 
-## Phase-Specific Warnings
+### 🟡 MODERATE — SSE-5: SSE `StreamingResponse` Generator Keeps Running After Client Disconnect in Starlette < 0.27
 
-| Phase | Topic | Pitfall to Watch | Mitigation |
-|-------|-------|-----------------|------------|
-| **1. Mosquitto + Docker Compose** | Adding broker service | DOCKER-1: No config → silent connection refused | Mount `mosquitto.conf` with `listener 1883` + `allow_anonymous true` before testing |
-| **1. Mosquitto + Docker Compose** | Service ordering | DOCKER-2: API starts before broker ready | Add healthcheck + `depends_on: condition: service_healthy` |
-| **2. sensor_readings migration** | Alembic migration | DB-1: Missing composite index | Include all 3 indexes in migration (see Strategy C) |
-| **2. sensor_readings migration** | Table design | DB-2: Unbounded growth | Set simulator interval to ≥10s; add retention comment |
-| **3. aiomqtt consumer** | lifespan integration | MQTT-2: Consumer as BackgroundTask | Use `asyncio.create_task()` in lifespan, not BackgroundTasks |
-| **3. aiomqtt consumer** | Async/sync boundary | MQTT-1: Sync SQLAlchemy blocks event loop | Use `run_in_executor` for all DB writes (see Strategy A) |
-| **3. aiomqtt consumer** | Reconnect logic | MQTT-4: Reconnect not cancellable | Re-raise `CancelledError` in reconnect loop |
-| **3. aiomqtt consumer** | Session management | MQTT-5: Session leak on exception | Always use try/finally for `db.close()` |
-| **4. WebSocket endpoint** | ConnectionManager | WS-1: Dead connection breaks broadcast | Wrap each send in try/except (see Strategy B) |
-| **4. WebSocket endpoint** | Concurrency | WS-2: List race condition | Use `asyncio.Lock` + `set` for connections |
-| **4. WebSocket endpoint** | Thread boundary | WS-3: broadcast() from thread | Keep broadcast in async context, not in run_in_executor |
-| **4. WebSocket endpoint** | Shutdown | WS-4: Connections open after shutdown | `close_all()` in lifespan teardown |
-| **5. Python simulator** | Publish rate | DB-4: Too many inserts | Enforce `PUBLISH_INTERVAL_SEC` env var default 10s |
-| **5. Python simulator** | Docker readiness | DOCKER-4: Starts before broker ready | `depends_on: mosquitto: condition: service_healthy` + retry |
-| **6. Next.js IoT page** | useEffect | WS-5: StrictMode double connection | Return `() => ws.close()` from every useEffect |
-| **6. Next.js IoT page** | Reconnect | WS-6: No reconnect after server restart | Implement exponential backoff reconnect hook |
-| **6. Next.js IoT page** | Memory | WS-7: Unbounded readings state | Cap state array to rolling window (`slice(-100)`) |
+**What goes wrong:**  
+In older Starlette versions (before the background-task cancellation fix in 0.27), a disconnected SSE client does NOT trigger `asyncio.CancelledError` in the generator. The generator blocks forever on `queue.get()`. All `asyncio.wait_for(..., timeout=15)` keepalive ticks still fire, sending data to a closed socket. The send fails silently (Starlette catches the exception internally), but the generator loop never exits.
+
+**How to avoid:**  
+- Current `fastapi==0.115.5` bundles `starlette==0.41.x` which correctly cancels generators on disconnect — verify with `pip show starlette`.
+- Add explicit disconnect detection via `Request.is_disconnected()`:
+```python
+async def sse_event_generator(request: Request, user_id: str):
+    queue = asyncio.Queue(maxsize=100)
+    sse_manager.register(user_id, queue)
+    try:
+        while True:
+            if await request.is_disconnected():
+                break
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=15.0)
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+    finally:
+        sse_manager.unregister(user_id, queue)
+```
+`Request` must be injected into the endpoint and passed into the generator.
+
+**Warning signs:**  
+- SSE generator has no timeout (pure `await queue.get()`)  
+- No `request.is_disconnected()` check  
+- No `asyncio.CancelledError` handler in generator
+
+**Phase to address:** SSE notification endpoint phase
 
 ---
 
-## Quick Diagnostic Checklist
+### 🟡 MODERATE — SSE-6: Nginx / Reverse-Proxy Kills SSE Connection After 60s Without Data
 
-Run these checks during development to catch pitfalls early:
+**What goes wrong:**  
+Most reverse proxies (Nginx default, AWS ALB, Cloudflare) close idle connections after 60 seconds. An SSE stream with no events for >60 seconds (e.g., no threshold alerts triggered) is silently terminated by the proxy. The browser's `EventSource` reconnects (after 3–5s), creating a flood of reconnect events on every quiet period.
 
-```bash
-# 1. Verify Mosquitto config is loaded
-docker exec mosquitto cat /mosquitto/config/mosquitto.conf
-
-# 2. Test Mosquitto accepts connections
-docker exec mosquitto mosquitto_pub -h localhost -t test -m "hello" -q
-
-# 3. Check DB connection pool (add debug endpoint first)
-curl http://localhost:8000/debug/pool
-
-# 4. Verify sensor_readings indexes exist
-docker exec -it <pg_container> psql -U postgres -d asset_management -c \
-  "SELECT indexname FROM pg_indexes WHERE tablename = 'sensor_readings';"
-
-# 5. Check for event loop blocking (add to MQTT handler temporarily)
-import time
-start = time.monotonic()
-# ... db write ...
-elapsed = time.monotonic() - start
-if elapsed > 0.05:
-    logger.warning(f"DB write took {elapsed:.3f}s — may be blocking event loop")
-
-# 6. Verify WebSocket broadcast reaches all clients
-# Open browser DevTools Network tab → WS → check Messages stream
-# Disconnect one tab → verify remaining tabs still receive messages
+**How to avoid:**  
+Send SSE comment keepalives every 15 seconds using the `asyncio.wait_for` timeout pattern from SSE-1:
+```python
+except asyncio.TimeoutError:
+    yield ": keepalive\n\n"  # SSE spec allows comment lines; EventSource ignores them
 ```
+This keeps the TCP connection alive through proxy idle timeouts. 15s interval is conservative — 30s also works with most proxies.
+
+Also add Nginx config in docker-compose if using an nginx service:
+```nginx
+proxy_read_timeout 3600;
+proxy_buffering off;  # CRITICAL for SSE — without this, Nginx buffers the stream
+```
+
+**Warning signs:**  
+- SSE generator has no keepalive mechanism  
+- `EventSource` reconnects every ~60s in browser dev tools  
+- `proxy_buffering` not set in Nginx config
+
+**Phase to address:** SSE notification endpoint phase; Nginx config if applicable
+
+---
+
+### 🟢 MINOR — SSE-7: Next.js `EventSource` Does Not Automatically Send Auth Headers — JWT Cannot Be Passed as Bearer
+
+**What goes wrong:**  
+The browser `EventSource` API does not support custom HTTP headers. JWT auth via `Authorization: Bearer <token>` is impossible. If the SSE endpoint requires auth (it should), the frontend cannot authenticate using the existing JWT pattern.
+
+**How to avoid:**  
+Pass the JWT as a query parameter for SSE endpoints:
+```
+GET /api/v1/notifications/stream?token=<jwt>
+```
+Validate the token in the SSE endpoint handler:
+```python
+@router.get("/notifications/stream")
+async def sse_stream(token: str = Query(...), request: Request = ...):
+    user = verify_token(token)  # raises HTTPException on invalid token
+    ...
+```
+This is the standard pattern for SSE auth. Document that this token is short-lived or SSE-scoped to reduce exposure in server logs.
+
+**Warning signs:**  
+- SSE endpoint has no auth dependency  
+- Frontend tries to set `Authorization` header via `EventSource` (silently ignored by browser)
+
+**Phase to address:** SSE notification endpoint phase
+
+---
+
+## Section 3: MQTT Consumer Modification for Threshold Alerting
+
+### 🔴 CRITICAL — MQTT-A1: Second `asyncio.to_thread()` Call for Alert Write Inside `_process_message` Without Independent Error Handling
+
+**What goes wrong:**  
+The existing `_process_message` already calls `await asyncio.to_thread(_write_to_db, ...)`. Adding threshold alerting by appending a second `await asyncio.to_thread(_write_alert_to_db, ...)` looks clean, but if the sensor reading write succeeds and the alert write fails (e.g., alerts table doesn't exist yet, FK violation), the exception propagates up through `_process_message`. Since `_process_message` is launched as `asyncio.create_task()`, an unhandled exception in the task is silently swallowed (Python 3.11+: logged as "Task exception was never retrieved", but execution continues). The sensor reading is persisted, but the alert is lost — with no indication of failure.
+
+**Why it happens:**  
+Fire-and-forget `create_task` exceptions are not propagated to the caller. The developer sees normal operation (sensor readings flowing) and doesn't notice missing alerts.
+
+**How to avoid:**  
+Wrap each `to_thread` call in its own try/except within `_process_message`:
+```python
+async def _process_message(topic: str, payload_bytes: bytes) -> None:
+    # ... parse topic and payload ...
+
+    # Step 1: Persist sensor reading (existing — keep as-is)
+    await asyncio.to_thread(_write_to_db, device_id, metric, value, unit, ts_ms)
+
+    # Step 2: WebSocket broadcast (existing — keep as-is)
+    await connection_manager.broadcast(device_id, {...})
+
+    # Step 3: Threshold check + alert write + SSE notify (new)
+    try:
+        alert = _check_threshold(device_id, metric, value)
+        if alert:
+            await asyncio.to_thread(_write_alert_to_db, alert)
+            await sse_manager.notify(alert["user_id"], alert)
+    except Exception:
+        logger.exception("Alert write failed for device=%s metric=%s", device_id, metric)
+        # DO NOT re-raise — sensor reading already persisted; alert failure is non-fatal
+```
+
+**Warning signs:**  
+- Second `to_thread` call is outside a try/except  
+- Alert writes fail silently (no log entries) when alerts table migration hasn't run  
+- `asyncio` logs "Task exception was never retrieved" for `_process_message` tasks
+
+**Phase to address:** Threshold alerting phase (MQTT consumer modification)
+
+---
+
+### 🔴 CRITICAL — MQTT-A2: Alert Storm — Threshold Fires on Every Message for a Sustained Breach
+
+**What goes wrong:**  
+A sensor publishes temperature every 5 seconds. Temperature is stuck at 85°C (threshold: 80°C). Every single MQTT message triggers `_check_threshold()`, which returns True, writes a new alert row, and sends an SSE notification. Over 10 minutes: 120 duplicate alert rows in the DB, 120 SSE events pushing "temperature high" to the frontend, frontend notification badge shows 120 unread.
+
+**Why it happens:**  
+Naive threshold check: `if value > threshold: create_alert()`. No deduplication or cooldown logic.
+
+**How to avoid:**  
+Implement per-device-per-metric cooldown in memory (module-level dict in consumer.py):
+```python
+from datetime import datetime, timezone
+from collections import defaultdict
+
+# Module-level cooldown state (in-process, resets on restart — acceptable for dev)
+_alert_cooldown: dict[tuple[str, str], datetime] = {}
+_ALERT_COOLDOWN_SECONDS = 300  # 5 minutes between same-device-same-metric alerts
+
+def _should_alert(device_id: str, metric: str) -> bool:
+    key = (device_id, metric)
+    now = datetime.now(timezone.utc)
+    last = _alert_cooldown.get(key)
+    if last and (now - last).total_seconds() < _ALERT_COOLDOWN_SECONDS:
+        return False  # still in cooldown
+    _alert_cooldown[key] = now
+    return True
+```
+For production: persist cooldown state in Redis or a DB `last_alerted_at` column to survive restarts.
+
+**Warning signs:**  
+- No cooldown/deduplication logic in threshold check  
+- `alerts` table row count grows at sensor publish rate (5s = 12 alerts/min per breaching device)  
+- Frontend notification badge number spikes to hundreds quickly
+
+**Phase to address:** Threshold alerting phase — cooldown MUST be part of the initial implementation
+
+---
+
+### 🟡 MODERATE — MQTT-A3: Adding Threshold Logic to `_process_message` Creates Import Cycle Between consumer.py and sse_manager.py
+
+**What goes wrong:**  
+`consumer.py` currently imports `connection_manager` from `websocket_manager.py`. Adding SSE notification requires importing `sse_manager` from a new `sse_manager.py`. If `sse_manager.py` imports anything from `consumer.py` (e.g., shared constants, threshold config), a circular import results in `ImportError: cannot import name 'sse_manager' from partially initialized module`.
+
+**Why it happens:**  
+Both consumer.py and sse_manager.py are "infrastructure singletons" that need to share state. Putting threshold config (sensor names, threshold values) in consumer.py and importing it from sse_manager.py creates the cycle.
+
+**How to avoid:**  
+Keep the dependency graph one-directional:
+```
+consumer.py → sse_manager.py  (consumer notifies SSE)
+consumer.py → websocket_manager.py  (existing)
+sse_manager.py → (no import from consumer or websocket_manager)
+```
+Put shared threshold config in `app/config.py` or a separate `app/ml/thresholds.py` module that neither consumer.py nor sse_manager.py imports FROM each other.
+
+**Warning signs:**  
+- `sse_manager.py` imports from `consumer.py` or `websocket_manager.py`  
+- `ImportError` on startup mentioning circular import involving these files
+
+**Phase to address:** SSE notification manager phase (define dependency graph before coding)
+
+---
+
+### 🟡 MODERATE — MQTT-A4: Running `model.predict()` Inside the MQTT Consumer Task
+
+**What goes wrong:**  
+The MQTT consumer fires `asyncio.create_task(_process_message(...))` for every sensor message. If someone adds `model.predict(feature_vector)` inside `_process_message` (to trigger AI-based alerts alongside threshold alerts), the inference runs in the async event loop — CPU-bound, blocking. At 5s publish intervals × 5 devices = 1 task/second calling predict(). Each predict() takes 20ms = event loop blocks for 20ms/s minimum, compounding with DB writes.
+
+**Why it happens:**  
+The MQTT consumer already has the sensor data, so it seems efficient to run inference there. But the consumer task context is async, not a thread pool.
+
+**How to avoid:**  
+Do NOT run inference in the MQTT consumer. Inference belongs in the HTTP inference endpoint only:
+- MQTT consumer: write to DB, threshold check, SSE notify — all fast/thread-offloaded
+- Inference: triggered by the frontend via `POST /api/v1/ai/predict/{asset_id}` — runs on demand
+- If background inference is needed: use a separate `asyncio.create_task()` that calls `asyncio.to_thread(model.predict, ...)` — NOT inline in `_process_message`
+
+**Warning signs:**  
+- `model.predict()` or `get_model().predict()` call inside `_process_message()`  
+- Inference logic imported into `consumer.py`
+
+**Phase to address:** AI inference phase — explicitly document that inference is HTTP-only
+
+---
+
+### 🟢 MINOR — MQTT-A5: Alert Write Function Does Not Follow the `_write_to_db` Pattern — Connection Not Closed on Error
+
+**What goes wrong:**  
+The existing `_write_to_db` in consumer.py uses a `try/except/finally` pattern with `db.close()` in `finally`. A new `_write_alert_to_db` written hastily omits the `finally: db.close()` block. On DB errors (constraint violation, connection timeout), the session is not returned to the pool. After N errors, the pool is exhausted and all subsequent DB operations hang until pool timeout.
+
+**How to avoid:**  
+Mirror the exact pattern from `_write_to_db`:
+```python
+def _write_alert_to_db(device_id: str, metric: str, value: float, threshold: float, ...) -> None:
+    db = SessionLocal()
+    try:
+        alert = Alert(device_id=device_id, metric=metric, ...)
+        db.add(alert)
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to persist alert: device=%s metric=%s", device_id, metric)
+        raise  # let caller handle via MQTT-A1's try/except
+    finally:
+        db.close()  # ALWAYS — prevents pool exhaustion
+```
+
+**Warning signs:**  
+- `_write_alert_to_db` missing `finally: db.close()`  
+- Pool exhaustion symptoms: DB queries hang after a burst of alert errors  
+- `sqlalchemy.exc.TimeoutError: QueuePool limit of size 10` in logs after threshold alert errors
+
+**Phase to address:** Threshold alerting phase — copy `_write_to_db` signature as template
+
+---
+
+## Section 4: Integration-Specific Cross-Cutting Pitfalls
+
+### 🔴 CRITICAL — INT-1: SSE Manager Not Cleaned Up in Lifespan Shutdown
+
+**What goes wrong:**  
+`main.py` lifespan currently cancels the MQTT task and calls `connection_manager.close_all()`. If `sse_manager` is added as a new module but its cleanup (drain queues, remove all registrations) is not added to lifespan shutdown, on graceful shutdown:
+- Active SSE generators receive `asyncio.CancelledError` and try to call `sse_manager.unregister()` — but if `sse_manager` itself is already in a bad state, this raises secondary errors in the shutdown sequence.
+- Zombie queues with unread events exist at the moment the process exits, potentially causing `RuntimeError: Event loop is closed` warnings.
+
+**How to avoid:**  
+Add `sse_manager.close_all()` to lifespan shutdown, mirroring `connection_manager.close_all()`:
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    load_model()
+    mqtt_task = asyncio.create_task(start_mqtt_consumer())
+    yield
+    mqtt_task.cancel()
+    await connection_manager.close_all()
+    await sse_manager.close_all()  # ← new
+    try:
+        await mqtt_task
+    except asyncio.CancelledError:
+        pass
+```
+
+**Warning signs:**  
+- `sse_manager` not mentioned in `main.py` lifespan  
+- `RuntimeError: Event loop is closed` in logs during `docker compose down`
+
+**Phase to address:** SSE notification manager phase
+
+---
+
+### 🟡 MODERATE — INT-2: SSE and WebSocket Connection State Are Not Visible in the Health Check
+
+**What goes wrong:**  
+`GET /api/v1/health` currently returns `{"status": "ok", "version": "2.0.0"}`. After adding SSE and AI model, a "healthy" response doesn't confirm whether the model is loaded, how many SSE connections are active, or whether the MQTT consumer is running. This makes debugging silent failures (model not loaded, SSE registry leaked) difficult in production.
+
+**How to avoid:**  
+Extend health check to report component status:
+```python
+@app.get("/api/v1/health")
+def health_check():
+    return {
+        "status": "ok",
+        "version": "2.2.0",
+        "components": {
+            "model_loaded": get_model() is not None,
+            "mqtt_consumer": "running",  # or check task status
+            "sse_connections": sse_manager.connection_count(),
+            "ws_connections": connection_manager.connection_count(),
+        }
+    }
+```
+
+**Warning signs:**  
+- Health endpoint only returns `{"status": "ok"}`  
+- No visibility into model load state or SSE registry size
+
+**Phase to address:** Any phase — add incrementally as each component is added
+
+---
+
+### 🟡 MODERATE — INT-3: Pool Size 10 Is Insufficient When MQTT Consumer Adds Alert Writes Concurrently With HTTP Requests
+
+**What goes wrong:**  
+Current pool: `pool_size=10, max_overflow=20`. With 5 devices × 1 message/5s = 1 sensor write/second (existing). Adding threshold alerting: potentially 5 simultaneous alert writes + 5 sensor writes = 10 concurrent `to_thread` DB calls. During a brief spike (all 5 devices breach threshold simultaneously), 10 connections are in use. Concurrent HTTP requests (user viewing dashboard, loading maintenance records) get `QueuePool limit` errors.
+
+**How to avoid:**  
+Increase pool size in `database.py` to accommodate MQTT + alert writes:
+```python
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=15,      # increased from 10
+    max_overflow=30,   # increased from 20
+    pool_timeout=30,
+)
+```
+Also consider serializing threshold alert writes: if 5 devices all breach simultaneously, check if alert cooldown (see MQTT-A2) naturally serializes writes.
+
+**Warning signs:**  
+- `sqlalchemy.exc.TimeoutError: QueuePool limit of size 10 overflow 20` in logs during high sensor activity  
+- Alert writes failing during peak MQTT message bursts
+
+**Phase to address:** Threshold alerting phase — adjust pool sizing when adding alert writes
+
+---
+
+### 🟢 MINOR — INT-4: `asyncio.to_thread` Thread Pool Exhaustion Under High MQTT Message Rate
+
+**What goes wrong:**  
+`asyncio.to_thread()` uses Python's default `ThreadPoolExecutor` (default: `min(32, cpu_count + 4)` threads, typically 8–12 on a dev machine). With 5 devices × 6 metrics × 0.2 messages/s = 6 `to_thread` calls/second for sensor writes. Adding alert writes: potentially 6 more. Each `to_thread` task holds a thread for ~5–20ms (DB write time). Under 10+ concurrent writes, threads may queue. If thread pool is exhausted, `asyncio.to_thread()` blocks the event loop until a thread is free.
+
+**How to avoid:**  
+For production, configure a dedicated thread pool executor in `main.py`:
+```python
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    loop = asyncio.get_event_loop()
+    executor = ThreadPoolExecutor(max_workers=20, thread_name_prefix="db_worker")
+    loop.set_default_executor(executor)
+    ...
+```
+For v2.2 dev scale (5 devices), the default pool is sufficient — this becomes relevant at >20 devices.
+
+**Warning signs:**  
+- `asyncio.to_thread` calls taking >100ms (check with timing logs)  
+- Event loop latency metrics show periodic spikes correlating with DB write bursts
+
+**Phase to address:** Performance tuning phase (if needed) — not critical for v2.2 scale
+
+---
+
+## Technical Debt Patterns
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| In-memory alert cooldown (MQTT-A2) | No Redis dependency, simple code | Resets on restart — duplicate alerts on pod restart | Acceptable for v2.2 single-instance |
+| JWT in SSE query param (SSE-7) | Works without header workaround | Token visible in server logs, URL history | Acceptable for v2.2; mitigate with short-lived SSE tokens in v3.0 |
+| Sync `def` for inference endpoint | No event-loop-blocking concern | Cannot use async dependencies natively | Always acceptable for CPU-bound routes |
+| Module-level model singleton | Simple, no DI framework | Hard to reload without restart | Acceptable until hot-reload is required |
+| Separate SSE + WS managers | Clear separation of protocols | Duplicated lock/snapshot pattern | Acceptable — do NOT merge them |
+
+---
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| sklearn → FastAPI | `predict()` in `async def` without `to_thread` | Use `def` endpoint OR `await asyncio.to_thread(model.predict, X)` |
+| SSE → asyncio.Queue | `asyncio.Queue()` no maxsize | `asyncio.Queue(maxsize=100)` always |
+| MQTT consumer → SSE | `await queue.put()` inside `_lock` | Snapshot under lock, `put_nowait()` outside lock |
+| SSE → Nginx | Missing `proxy_buffering off` | Add to Nginx location block for SSE path |
+| model.pkl → Docker | Hardcoded absolute path | Use `settings.MODEL_PATH` from env var |
+| alert write → pool | Missing `finally: db.close()` | Mirror `_write_to_db` pattern exactly |
+| SSE auth → EventSource | `Authorization: Bearer` header | `?token=<jwt>` query param |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| `predict()` in async event loop | >50ms API latency under load | `def` endpoint or `to_thread` | At first request if predict() > 5ms |
+| Unbounded SSE queue | Memory growth over hours | `asyncio.Queue(maxsize=100)` | After ~1 hour of 100 events/min |
+| Alert storm (no cooldown) | DB alert rows = sensor message count | Per-device cooldown dict | On first sustained threshold breach |
+| `joblib.load()` per request | Slow requests + OOM on concurrent load | Load at lifespan startup | At first concurrent request |
+| pool_size=10 + alert writes | QueuePool timeout during sensor bursts | pool_size=15, max_overflow=30 | At ~10 concurrent DB operations |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **SSE endpoint:** Generator has `finally: sse_manager.unregister(...)` — verify by checking browser tab close causes dict cleanup
+- [ ] **SSE endpoint:** `asyncio.wait_for(queue.get(), timeout=15)` keepalive — verify no Nginx 60s timeout in staging
+- [ ] **SSE manager:** Keys by connection queue (set per user), not single queue per user — verify with 2 browser tabs
+- [ ] **Model loading:** `load_model()` called in lifespan, not in endpoint — verify `_model is not None` at request time
+- [ ] **Model artifact:** Saved as `{"model": ..., "feature_names": [...]}` dict — verify inference uses saved feature order
+- [ ] **Alert write:** `_write_alert_to_db` has `finally: db.close()` — verify by checking pool exhaustion under error injection
+- [ ] **Alert cooldown:** Same device+metric doesn't fire twice within 5 minutes — verify with sustained threshold breach test
+- [ ] **Lifespan:** `sse_manager.close_all()` called alongside `connection_manager.close_all()` — verify clean shutdown
+- [ ] **SSE auth:** `?token=` query param validated in endpoint — verify unauthenticated request returns 401
+- [ ] **MQTT consumer:** `model.predict()` NOT called inside `_process_message` — verify no inference imports in consumer.py
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| AI-1: predict() blocks event loop | AI inference endpoint phase | `def` endpoint or `to_thread` confirmed in code review |
+| AI-2: model loaded per request | AI model loading phase | `load_model()` in lifespan only |
+| AI-3: feature vector mismatch | Training script phase | model artifact is dict with `feature_names` key |
+| AI-4: model missing at startup | AI model loading phase | startup log confirms model path + size |
+| SSE-1: queue registry leak | SSE manager phase | `finally` cleanup in generator confirmed |
+| SSE-2: single queue per user | SSE manager phase | set-of-queues per user_id in SSEManager |
+| SSE-3: lock held during put | SSE manager phase | snapshot pattern, `put_nowait` outside lock |
+| SSE-4: unbounded queue | SSE manager phase | `maxsize=100` in all Queue() constructors |
+| SSE-5: generator survives disconnect | SSE endpoint phase | `request.is_disconnected()` check present |
+| SSE-6: proxy 60s timeout | SSE endpoint phase | 15s keepalive comment event in generator |
+| SSE-7: EventSource auth | SSE endpoint phase | `?token=` param, no `Authorization` header |
+| MQTT-A1: silent alert write failure | Threshold alerting phase | try/except around alert block in `_process_message` |
+| MQTT-A2: alert storm | Threshold alerting phase | cooldown dict in consumer.py |
+| MQTT-A3: circular import | SSE manager phase | one-directional import graph verified |
+| MQTT-A4: predict() in MQTT task | AI inference phase | no inference imports in consumer.py |
+| MQTT-A5: missing db.close() in alert write | Threshold alerting phase | `finally: db.close()` in `_write_alert_to_db` |
+| INT-1: SSE manager not in lifespan | SSE manager phase | `sse_manager.close_all()` in main.py lifespan |
+| INT-3: pool exhaustion | Threshold alerting phase | `pool_size=15` in database.py |
+
+---
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Model missing at startup | LOW | Copy pkl to correct path, `docker compose restart api` |
+| Feature mismatch (wrong predictions) | HIGH | Retrain with corrected feature pipeline; version the pkl filename |
+| SSE queue leak (memory growth) | LOW | `docker compose restart api`; add SSE-1 fix |
+| Alert storm (DB flooded) | MEDIUM | Add cooldown; run `DELETE FROM alerts WHERE created_at > now() - interval '1 hour'` |
+| Pool exhaustion | LOW | Increase pool_size in database.py + restart; check for missing `db.close()` |
+| Circular import | LOW | Refactor import direction; move shared config to neutral module |
 
 ---
 
 ## Sources
 
-- FastAPI documentation: lifespan events, WebSocket patterns, BackgroundTasks scope
-- aiomqtt documentation: Client context manager, reconnect patterns
-- SQLAlchemy 2.0 documentation: sync session lifecycle, connection pool configuration
-- asyncio documentation: run_in_executor, CancelledError handling, Lock
-- Mosquitto 2.x documentation: listener configuration, breaking changes from 1.x
-- React documentation: useEffect cleanup, StrictMode double-invocation behavior
-- PostgreSQL documentation: index types, EXPLAIN ANALYZE, connection pooling
-- Confidence: HIGH — all patterns verified against actual v2.0 codebase (sync SQLAlchemy confirmed in database.py, lifespan verified in main.py)
+- Codebase audit: `backend/app/mqtt/consumer.py` — `_write_to_db`, `_process_message`, `create_task` pattern
+- Codebase audit: `backend/app/services/websocket_manager.py` — ConnectionManager lock/snapshot/broadcast pattern
+- Codebase audit: `backend/app/main.py` — lifespan shutdown sequence
+- Codebase audit: `backend/app/database.py` — `pool_size=10, max_overflow=20`
+- Codebase audit: `backend/requirements.txt` — `fastapi==0.115.5`, `sqlalchemy==2.0.36`, no sklearn/joblib yet
+- FastAPI StreamingResponse + asyncio.Queue: Starlette source + FastAPI docs on SSE patterns
+- scikit-learn thread safety: sklearn docs + CPython GIL behavior for numpy operations
+- SSE proxy timeout: Nginx proxy_buffering and proxy_read_timeout documentation
+- asyncio.Queue patterns: Python 3.12 asyncio docs
+- v2.1 architecture decisions: `.planning/milestones/v2.1-ROADMAP.md`
+
+---
+*Pitfalls research for: v2.2 AI Predictive Maintenance & SSE Notifications*  
+*Researched: 2026-07-05*  
+*Confidence: HIGH — all pitfalls grounded in actual v2.1 codebase patterns*
