@@ -1,5 +1,15 @@
 # Milestones
 
+## v2.0 Backend Foundation (Shipped: 2026-07-05)
+
+**Phases completed:** 6 phases, 6 plans, 0 tasks
+
+**Key accomplishments:**
+
+- (none recorded)
+
+---
+
 ## v1.3 milestone (Shipped: 2026-06-30)
 
 **Phases completed:** 24 phases

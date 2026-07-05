@@ -24,18 +24,19 @@ Give teams a production-grade, enterprise-style asset management platform with r
 - ✓ Implement all 10 frontend UI sections with mock/static data aligned to SDD wireframes — v1.3
 - ✓ Extend existing v1.1 pages (Dashboard, Assets, Assignments, Maintenance) per WIREFRAMES.md §2–§5 — v1.3
 - ✓ Build new pages: IoT Monitoring, AI Predictive, Notifications, Audit Log, User Management — v1.3
+- ✓ FastAPI backend scaffold: project structure, Docker Compose, .env.example, Alembic, seed script — v2.0
+- ✓ SQLAlchemy ORM models + Alembic initial migration for all core domain entities — v2.0
+- ✓ JWT authentication: login, refresh token, /auth/me, get_current_user, require_role RBAC — v2.0
+- ✓ Asset API: paginated CRUD + lifecycle state machine with 409 guards — v2.0
+- ✓ User, Assignment & Maintenance APIs: full workflow with asset.status sync, business rule enforcement — v2.0
+- ✓ Frontend wired to real FastAPI backend with graceful demo-mode fallback — v2.0
 
 ### Active
 
-- [ ] Scaffold FastAPI backend project structure (routers, models, schemas, services, dependencies) — v2.0
-- [ ] Docker Compose dev environment: FastAPI + PostgreSQL + pgAdmin + hot-reload uvicorn — v2.0
-- [ ] SQLAlchemy ORM models + Alembic migrations for all core domain entities — v2.0
-- [ ] JWT authentication endpoints (login, logout, refresh token) with RBAC middleware — v2.0
-- [ ] Asset API: CRUD + lifecycle state machine endpoints — v2.0
-- [ ] User management API: list, create, edit role, deactivate (Admin-only) — v2.0
-- [ ] Assignment API: request, approve, reject, initiate-return, close workflow — v2.0
-- [ ] Maintenance API: create ticket, update status, list by asset — v2.0
-- [ ] Frontend API wiring: replace in-memory mock store with real HTTP API calls — v2.0
+- [ ] IoT MQTT pipeline: Python sensor simulator → Mosquitto → FastAPI consumer → PostgreSQL sensor_readings — v2.1
+- [ ] AI predictive maintenance backend: ML model (Random Forest/XGBoost) + ai_recommendations API + Manager approval gate — v2.1
+- [ ] Notification delivery pipeline: event triggers → SSE endpoint → in-app notification center — v2.1
+- [ ] Real-time sensor data: WebSocket endpoint pushing sensor_readings to IoT Monitoring page — v2.1
 
 ### Out of Scope
 
@@ -64,8 +65,11 @@ v1.3 shipped: complete frontend UI with 24 phases, all 10 dashboard sections imp
 | Optimize artifacts for engineering handoff | Primary audience is implementation team, not stakeholder-only deck | ✅ Shipped v1.0–v1.2 |
 | Keep AI specification at integration boundary level | Reduces early overdesign while preserving actionable system flow | ✅ Applied v1.0–v1.2 |
 | Build full frontend with mock data before backend | Validate UX/flows before committing to API contracts | ✅ Shipped v1.3 |
-| Use Alembic for DB migrations | Standard FastAPI/PostgreSQL production practice; version-controlled schema | 🔄 v2.0 |
-| Docker Compose dev environment | Matches real-world IoT/AI deployment model; no manual DB setup | 🔄 v2.0 |
+| Use Alembic for DB migrations | Standard FastAPI/PostgreSQL production practice; version-controlled schema | ✅ Shipped v2.0 |
+| Docker Compose dev environment | Matches real-world IoT/AI deployment model; no manual DB setup | ✅ Shipped v2.0 |
+| Build full frontend with mock data before backend | Validate UX/flows before committing to API contracts | ✅ Shipped v1.3 — frontend wired in v2.0 |
+| bcrypt via direct calls (not passlib) | passlib compatibility issues with bcrypt 4.x; direct bcrypt API is stable | ✅ Shipped v2.0 |
+| Graceful demo-mode fallback in frontend | Backend unavailability should not break demo/dev workflow | ✅ Shipped v2.0 |
 
 ## Evolution
 
@@ -86,18 +90,19 @@ This document evolves at phase transitions and milestone boundaries.
 
 ## Current State
 
-v1.0 shipped: architecture/workflow blueprint. v1.1 shipped: full English frontend rebuild with mock data. v1.2 shipped: complete SDD artifact set (272KB, 6 documents). v1.3 shipped: complete frontend UI — 24 phases, all 10 dashboard sections (Dashboard, Assets, Assignments, Maintenance, IoT Monitoring, AI Predictive Maintenance, Notifications, Audit Log, User Management, Reports) with 0 TypeScript errors.
+**v2.0 shipped (2026-07-05):** Production-grade FastAPI + PostgreSQL backend fully implemented. FastAPI app in Docker Compose (api + postgres:16 + pgAdmin), JWT/RBAC auth, 4 domain API groups (Asset, User, Assignment, Maintenance), and frontend wired to real backend with demo-mode fallback. ~1,456 LOC Python, ~8,079 LOC TypeScript. 0 TypeScript errors.
 
-## Current Milestone: v2.0 Backend Foundation
+**Prior milestones:** v1.0 architecture blueprint → v1.1 full English frontend rebuild → v1.2 complete SDD artifact set → v1.3 all 10 dashboard sections with mock data → v2.0 real backend.
 
-**Goal:** Build a production-grade FastAPI + PostgreSQL backend with Docker Compose dev environment, JWT/RBAC authentication, and core domain APIs — then wire the existing frontend to consume real data instead of mock data.
+## Next Milestone: v2.1 IoT & AI Backend
+
+**Goal:** Add IoT sensor pipeline, AI predictive maintenance model, and real-time notification delivery to complete the full-stack system.
 
 **Target features:**
-- FastAPI project structure (routers/models/schemas/services pattern)
-- Docker Compose: FastAPI + PostgreSQL + pgAdmin + hot-reload uvicorn
-- SQLAlchemy ORM models + Alembic migrations (Asset, User, Assignment, Maintenance)
-- JWT Authentication + RBAC (Admin / Asset Manager / Staff / Auditor)
-- Asset API — CRUD + lifecycle state machine
+- Python sensor simulator → MQTT (Mosquitto) → FastAPI consumer → `sensor_readings` table
+- Scikit-learn ML model (Random Forest) → `ai_recommendations` table + Manager approval gate
+- SSE notification endpoint → in-app notification center
+- WebSocket real-time sensor data to IoT Monitoring page
 - User API — user management (Admin-only)
 - Assignment API — request/approve/reject/return workflow
 - Maintenance API — ticket creation + status transitions
