@@ -29,9 +29,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { CORRELATION_LABEL, formatConfidenceScore } from "@/lib/ai-governance"
+import { aiApi, type ApiAiRecommendation } from "@/lib/api"
+import { CORRELATION_LABEL, formatConfidenceScore, getConfidenceBand } from "@/lib/ai-governance"
 import {
-  buildRecommendations,
   formatSlaCountdown,
   getHighRiskSlaState,
   type PredictiveActionState,
@@ -39,14 +39,54 @@ import {
 } from "@/lib/predictive"
 import { useStore } from "@/lib/store"
 
+/** Map API response to the PredictiveRecommendation type used by the UI. */
+function toUiRec(api: ApiAiRecommendation, assetName: string): PredictiveRecommendation {
+  return {
+    id: api.id,
+    assetId: api.asset_id,
+    assetName,
+    risk: {
+      level: api.risk_level,
+      score: api.risk_score,
+    },
+    healthScore: Math.round(100 - api.risk_score),
+    confidence: {
+      score: api.confidence,
+      band: getConfidenceBand(api.confidence),
+    },
+    topFactors: api.top_factors,
+    correlation_id: api.correlation_id,
+    created_at: api.created_at,
+    slaDueAt: api.sla_due_at,
+    actionState: api.action_state,
+    deferReason: api.defer_reason ?? undefined,
+  }
+}
+
 export default function AiPredictivePage() {
   const { assets, user } = useStore()
-  const seedRecommendations = useMemo(() => buildRecommendations(assets), [assets])
-  const [recommendations, setRecommendations] = useState<PredictiveRecommendation[]>(seedRecommendations)
+  const [recommendations, setRecommendations] = useState<PredictiveRecommendation[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
+  // Build asset lookup for name resolution
+  const assetMap = useMemo(
+    () => Object.fromEntries(assets.map((a) => [a.id, a.name])),
+    [assets]
+  )
+
+  // Load recommendations from real API on mount
   useEffect(() => {
-    setRecommendations(seedRecommendations)
-  }, [seedRecommendations])
+    setIsLoading(true)
+    aiApi
+      .listRecommendations()
+      .then((items) => {
+        setRecommendations(items.map((r) => toUiRec(r, assetMap[r.asset_id] ?? r.asset_id)))
+      })
+      .catch(() => {
+        // API unavailable — keep empty state; no mock fallback
+      })
+      .finally(() => setIsLoading(false))
+  }, [])
 
   const canAct = user?.role === "Asset Manager" || user?.role === "Admin"
 
@@ -57,23 +97,29 @@ export default function AiPredictivePage() {
   const [deferTarget, setDeferTarget] = useState<PredictiveRecommendation | null>(null)
   const [deferReason, setDeferReason] = useState("")
 
-  function executeApprove(rec: PredictiveRecommendation) {
-    setRecommendations((prev) =>
-      prev.map((r) => r.id === rec.id ? { ...r, actionState: "approved" as const } : r)
-    )
-    toast.success(`Recommendation approved — maintenance ticket will be created for "${rec.assetName}"`)
+  async function executeApprove(rec: PredictiveRecommendation) {
+    try {
+      const updated = await aiApi.approveRecommendation(rec.id)
+      setRecommendations((prev) =>
+        prev.map((r) => r.id === rec.id ? toUiRec(updated, assetMap[updated.asset_id] ?? rec.assetName) : r)
+      )
+      toast.success(`Recommendation approved for "${rec.assetName}"`)
+    } catch {
+      toast.error("Failed to approve recommendation")
+    }
     setApproveTarget(null)
   }
 
-  function executeDefer(rec: PredictiveRecommendation) {
-    setRecommendations((prev) =>
-      prev.map((r) =>
-        r.id === rec.id
-          ? { ...r, actionState: "deferred" as const, deferReason: deferReason.trim() || undefined }
-          : r
+  async function executeDefer(rec: PredictiveRecommendation) {
+    try {
+      const updated = await aiApi.deferRecommendation(rec.id, deferReason.trim() || undefined)
+      setRecommendations((prev) =>
+        prev.map((r) => r.id === rec.id ? toUiRec(updated, assetMap[updated.asset_id] ?? rec.assetName) : r)
       )
-    )
-    toast.success(`Recommendation deferred for "${rec.assetName}"`)
+      toast.success(`Recommendation deferred for "${rec.assetName}"`)
+    } catch {
+      toast.error("Failed to defer recommendation")
+    }
     setDeferTarget(null)
     setDeferReason("")
   }
@@ -97,7 +143,7 @@ export default function AiPredictivePage() {
 
   return (
     <>
-      <Topbar title="AI Predictive" subtitle="Deterministic risk-ranked recommendations" />
+      <Topbar title="AI Predictive" subtitle="ML-powered risk-ranked maintenance recommendations" />
 
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
         {/* Summary Card */}

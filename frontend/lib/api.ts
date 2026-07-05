@@ -240,3 +240,67 @@ export const iotApi = {
     return `${wsBase}/iot/ws/${deviceId}`
   },
 }
+
+// ─── AI Predictive Maintenance types ─────────────────────────────────────────
+
+export interface ApiAiRecommendation {
+  id: string
+  asset_id: string
+  recommendation: string
+  confidence: number
+  risk_level: "Low" | "Medium" | "High"
+  risk_score: number
+  top_factors: string[]
+  correlation_id: string
+  approved_by: string | null
+  approved_at: string | null
+  action_state: "pending" | "approved" | "deferred"
+  defer_reason: string | null
+  sla_due_at: string | null
+  created_at: string
+}
+
+export const aiApi = {
+  listRecommendations: (assetId?: string): Promise<ApiAiRecommendation[]> => {
+    const url = assetId ? `/ai/recommendations?asset_id=${assetId}` : "/ai/recommendations"
+    return apiFetch<ApiAiRecommendation[]>(url)
+  },
+  triggerInference: (assetId: string): Promise<ApiAiRecommendation> =>
+    apiFetch<ApiAiRecommendation>("/ai/recommendations", {
+      method: "POST",
+      body: JSON.stringify({ asset_id: assetId }),
+    }),
+  approveRecommendation: (recId: string): Promise<ApiAiRecommendation> =>
+    apiFetch<ApiAiRecommendation>(`/ai/recommendations/${recId}/approve`, { method: "POST" }),
+  deferRecommendation: (recId: string, deferReason?: string): Promise<ApiAiRecommendation> =>
+    apiFetch<ApiAiRecommendation>(`/ai/recommendations/${recId}/defer`, {
+      method: "POST",
+      body: JSON.stringify({ defer_reason: deferReason ?? null }),
+    }),
+}
+
+// ─── Notification types ───────────────────────────────────────────────────────
+
+export interface ApiNotification {
+  id: string
+  user_id: string
+  type: "high_failure_risk" | "warranty_expiry" | "upcoming_maintenance" | "overdue_return"
+  title: string
+  message: string
+  is_read: boolean
+  href: string | null
+  created_at: string
+}
+
+export const notificationsApi = {
+  list: (): Promise<ApiNotification[]> =>
+    apiFetch<ApiNotification[]>("/notifications"),
+  markRead: (id: string): Promise<ApiNotification> =>
+    apiFetch<ApiNotification>(`/notifications/${id}/read`, { method: "PATCH" }),
+  markAllRead: (): Promise<{ updated: number }> =>
+    apiFetch<{ updated: number }>("/notifications/read-all", { method: "POST" }),
+  getSseUrl: (): string => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+    return token ? `${BASE_URL}/notifications/stream?token=${token}` : ""
+  },
+}

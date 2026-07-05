@@ -9,9 +9,11 @@ import { Topbar } from "@/components/topbar"
 import { Button } from "@/components/ui/button"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { notificationsApi } from "@/lib/api"
 import { type NotificationType } from "@/lib/data"
 import { useStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
+import { useNotifications } from "@/hooks/useNotifications"
 
 type FilterType = "All" | NotificationType
 
@@ -52,6 +54,19 @@ export default function NotificationsPage() {
   const { notifications, markNotificationRead, markAllNotificationsRead, unreadCount } = useStore()
   const [activeFilter, setActiveFilter] = useState<FilterType>("All")
 
+  // Connect to SSE stream and load initial notifications from REST
+  useNotifications()
+
+  async function handleMarkRead(id: string) {
+    markNotificationRead(id)
+    try { await notificationsApi.markRead(id) } catch { /* non-fatal */ }
+  }
+
+  async function handleMarkAllRead() {
+    markAllNotificationsRead()
+    try { await notificationsApi.markAllRead() } catch { /* non-fatal */ }
+  }
+
   const filtered = useMemo(
     () => activeFilter === "All" ? notifications : notifications.filter((n) => n.type === activeFilter),
     [notifications, activeFilter],
@@ -70,7 +85,7 @@ export default function NotificationsPage() {
             </span>
           </div>
           {unreadCount > 0 ? (
-            <Button variant="outline" size="sm" onClick={markAllNotificationsRead}>
+            <Button variant="outline" size="sm" onClick={handleMarkAllRead}>
               <RefreshCcw className="mr-1.5 size-3.5" />
               Mark all as read
             </Button>
@@ -141,7 +156,7 @@ export default function NotificationsPage() {
                           variant="ghost"
                           size="sm"
                           className="text-xs"
-                          onClick={() => markNotificationRead(notif.id)}
+                          onClick={() => handleMarkRead(notif.id)}
                         >
                           Mark read
                         </Button>

@@ -114,6 +114,8 @@ type StoreContextValue = {
   unreadCount: number
   markNotificationRead: (id: string) => void
   markAllNotificationsRead: () => void
+  setNotifications: (notifications: AppNotification[]) => void
+  prependNotification: (notification: AppNotification) => void
   // warranty data
   warrantyRecords: WarrantyRecord[]
   // employees
@@ -196,6 +198,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const markAllNotificationsRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
+  }, [])
+
+  const prependNotification = useCallback((notification: AppNotification) => {
+    setNotifications((prev) => [notification, ...prev])
   }, [])
 
   const login = useCallback((email: string, role: UserRole) => {
@@ -364,6 +370,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         unreadCount,
         markNotificationRead,
         markAllNotificationsRead,
+        setNotifications,
+        prependNotification,
         warrantyRecords,
         employees,
       }}
