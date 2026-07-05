@@ -1,508 +1,923 @@
-# Domain Pitfalls
+# IoT Integration Pitfalls
 
-**Domain:** Smart AI-Powered Asset Management System — IoT + AI + Real-time UI  
-**Milestone:** v1.2 IoT System Design (SDD)  
-**Researched:** 2026-06-28  
-**Confidence:** HIGH — grounded in IoT/ML/WebSocket production patterns and academic project constraints
+**Domain:** AI-Powered Asset Management System — v2.1 IoT Pipeline & Real-Time Data  
+**Milestone:** v2.1 — MQTT pipeline + WebSocket broadcasting added to existing FastAPI app  
+**Researched:** 2026-07-05  
+**Confidence:** HIGH — grounded in the actual v2.0 codebase (sync SQLAlchemy, psycopg2-binary, sync router endpoints)
 
----
-
-## Overview
-
-This document catalogs pitfalls specific to designing and building an IoT + AI Asset Management System with:
-- IoT Sensor Simulator → MQTT Broker → FastAPI Backend
-- AI Predictive Maintenance with Manager approval gate
-- Real-time sensor dashboards over WebSocket
-- Audit Log, Notifications, RBAC
-
-Pitfalls are organized by category, ordered by severity. Each includes: **what goes wrong**, **warning sign**, and **prevention strategy** as a design decision.
+> **Scope:** These pitfalls are specific to **adding** aiomqtt + WebSocket to the existing FastAPI app.
+> They are not generic MQTT pitfalls — they are integration traps created by the specific v2.0 baseline.
 
 ---
 
-## 1. IoT Integration Pitfalls (MQTT + Sensor Simulator + Data Ingestion)
+## Pre-Flight: Critical Baseline Reality Check
 
-### 🔴 CRITICAL — IoT-1: MQTT QoS 0 Message Loss Treated as Reliable Delivery
+Before any v2.1 code is written, audit these facts about the v2.0 baseline:
 
-**What goes wrong:** The default MQTT QoS level (0, "fire-and-forget") drops messages when the broker restarts, the subscriber is offline, or the network has packet loss. Teams design dashboards and AI pipelines assuming every published message is received — gaps in telemetry are silently missed, health scores are computed on incomplete time windows, and dashboards show stale data with no indication.
-
-**Warning sign:** Simulator publishes N messages but backend ingests fewer than N. Gap is only discovered during testing when someone manually counts.
-
-**Prevention (design decision):** Specify QoS 1 (at-least-once) for all telemetry topics in the MQTT broker configuration section of the SDD. Document the consequence: duplicate detection is required in the ingestion handler. Define a `message_id` field in the MQTT payload schema and make the ingestion endpoint idempotent on it. Note this in the IoT Architecture diagram as "dedup layer."
+| Fact | v2.0 Reality | v2.1 Implication |
+|------|-------------|-----------------|
+| SQLAlchemy engine | **Sync** `create_engine` + `Session` | MQTT callbacks cannot call `get_db()` directly from async context without blocking the event loop |
+| DB driver | **psycopg2-binary** (sync, C-based) | Not compatible with `asyncio` — blocks event loop if called without thread executor |
+| Router endpoints | **`def`** (sync) — FastAPI runs them in a thread pool | Existing pattern works; MQTT handler needs a different approach |
+| Connection pool | `pool_size=10, max_overflow=20` | Pool sized for HTTP requests only; MQTT adds concurrent write pressure |
+| lifespan | Empty `yield` in `asynccontextmanager` | aiomqtt consumer must be launched here — not as a per-request BackgroundTask |
 
 ---
 
-### 🔴 CRITICAL — IoT-2: No Topic Naming Convention → Unfiltered Wildcard Subscriptions
+## MQTT + SQLAlchemy Async Pitfalls
 
-**What goes wrong:** Simulator publishes to ad-hoc topics (`sensor/data`, `asset/temp`, `iot/readings`) and the backend subscribes with `#` (all topics). As new sensor types are added, the wildcard subscription delivers unrelated messages to all handlers. Schema changes in one sensor type break other sensor processors.
+### 🔴 CRITICAL — MQTT-1: Calling Sync SQLAlchemy Session from Async MQTT Handler Blocks Event Loop
 
-**Warning sign:** Backend has a single `on_message` handler with a long `if/elif` chain that checks topic strings.
+**What goes wrong:** aiomqtt delivers MQTT messages to an `async for message in client.messages` loop running inside
+the FastAPI event loop. If the message handler calls `get_db()` directly and executes a `db.add()` / `db.commit()`
+using the existing sync `Session` + psycopg2, the sync I/O call **blocks the entire event loop**. All WebSocket
+broadcasts, HTTP requests, and MQTT ACKs queue behind the database write. Under 10 sensors × 5 readings/min, the
+event loop is blocked for ~50ms per cycle — enough to cause visible WebSocket stutter and MQTT message backlog.
 
-**Prevention (design decision):** Define a topic hierarchy in the SDD before any simulator or backend code is written:
+**Warning sign:** Message handler looks like this:
+```python
+async for message in client.messages:
+    db = SessionLocal()          # WRONG — blocks event loop
+    reading = SensorReading(...)
+    db.add(reading)
+    db.commit()                  # BLOCKS — psycopg2 is sync
+    db.close()
 ```
-assets/{asset_id}/sensors/{sensor_type}
-# Example:
-assets/ASSET-001/sensors/temperature
-assets/ASSET-001/sensors/vibration
-assets/ASSET-001/sensors/power
+
+**Detection during dev:** `uvicorn` logs show >100ms response times for `/ws` WebSocket pings during active MQTT publishing. `asyncio.get_event_loop().is_running()` check inside the handler returns True, confirming the async context.
+
+**Prevention:** Two valid options:
+1. **Thread executor (keeps existing sync SQLAlchemy):**
+```python
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+_thread_pool = ThreadPoolExecutor(max_workers=4)
+
+async def handle_message(payload: dict):
+    def _write():
+        db = SessionLocal()
+        try:
+            db.add(SensorReading(**payload))
+            db.commit()
+        finally:
+            db.close()
+    await asyncio.get_event_loop().run_in_executor(_thread_pool, _write)
 ```
-Specify that backend subscribes to `assets/+/sensors/+` (single-level wildcards, not `#`). Document the topic schema as a formal contract table in the IoT Architecture section.
+2. **Migrate database.py to async SQLAlchemy** (recommended for v2.1+):
+```python
+# database.py — async version
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+engine = create_async_engine("postgresql+asyncpg://...", pool_size=10)
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+```
+⚠️ Option 2 requires changing all existing `def` routers to `async def` and replacing `Session` with `AsyncSession` — a larger refactor. For v2.1, Option 1 is the safer incremental approach.
 
 ---
 
-### 🔴 CRITICAL — IoT-3: Simulator Publishes at Backend Ingest Rate, Not Sensor Rate
+### 🔴 CRITICAL — MQTT-2: aiomqtt Consumer Launched as Per-Request BackgroundTask
 
-**What goes wrong:** The simulator is written to publish as fast as Python can loop — sometimes 1000 messages/second. The FastAPI endpoint, PostgreSQL write, and WebSocket broadcast all happen synchronously per message. The database becomes the bottleneck; MQTT broker buffers overflow; the entire system deadlocks under simulated load. This only surfaces during integration testing, which is too late in a design milestone.
+**What goes wrong:** A `BackgroundTasks` task in FastAPI is **per-request** — it runs after the response is sent
+for one HTTP request and then terminates. If the MQTT consumer is started via:
+```python
+@app.get("/start-mqtt")
+async def start_mqtt(background_tasks: BackgroundTasks):
+    background_tasks.add_task(mqtt_consumer)  # WRONG
+```
+…it only runs for the duration of that request's lifecycle. The consumer exits, no more messages are consumed,
+and the system silently drops all subsequent sensor readings.
 
-**Warning sign:** Simulator code uses `while True: publish(...)` with no sleep interval. Ingest endpoint is synchronous (`def` not `async def`).
+**Warning sign:** MQTT consumer starts successfully after hitting an endpoint, but stops receiving messages after 30–60 seconds. No error logs — it just stops.
 
-**Prevention (design decision):** Specify in the SDD:
-1. Simulator publish interval: 5–30 seconds per sensor per asset (configurable via `PUBLISH_INTERVAL_SEC` env var, default 10s).
-2. Ingestion handler is async. It writes to a background task queue (Celery task or FastAPI `BackgroundTasks`) and returns HTTP 202 immediately.
-3. The SDD IoT Architecture diagram must show the async boundary explicitly: MQTT → Ingest API → Background Worker → PostgreSQL/TimescaleDB → WebSocket Publisher.
+**Detection during dev:** Add `print("MQTT consumer exiting")` at the end of the consumer coroutine. If it prints, the consumer died.
+
+**Prevention:** Launch the MQTT consumer as a **lifespan task** — it must outlive all requests:
+```python
+# main.py
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(mqtt_consumer_task())  # starts with app
+    yield
+    task.cancel()                                      # stops with app
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+app = FastAPI(lifespan=lifespan)
+```
 
 ---
 
-### 🟡 MODERATE — IoT-4: Simulator Clock Drift vs. Server Timestamp
+### 🔴 CRITICAL — MQTT-3: Connection Pool Exhaustion Under MQTT Write Load
 
-**What goes wrong:** The simulator embeds its own `timestamp` in the MQTT payload using `datetime.now()`. When the simulator runs on a different machine or in a Docker container with clock skew, timestamps are out of order or in the future. AI feature engineering (rolling windows, time-since-last-reading) produces nonsense values. Dashboards show negative durations or future readings.
+**What goes wrong:** The v2.0 pool is configured as `pool_size=10, max_overflow=20` — designed for HTTP requests
+that hold a connection for <50ms. The MQTT consumer, if using `run_in_executor` with a thread pool, may hold
+connections longer (commit + close is ~5–20ms). Under sustained sensor load (10 sensors × 1 msg/5s = 2 inserts/sec),
+the pool handles it fine — but if the thread pool stalls (disk I/O, lock contention), connections accumulate.
+More dangerous: a bug that creates a `SessionLocal()` without `db.close()` in a finally block will leak
+connections permanently until the pool is exhausted and new requests fail with `QueuePool limit exceeded`.
 
-**Warning sign:** Payload schema defines `timestamp` as a field that the simulator populates. Backend stores it verbatim.
+**Warning sign:** 
+- `sqlalchemy.exc.TimeoutError: QueuePool limit of size 10 overflow 20 reached` in logs
+- HTTP requests start failing with 500 while MQTT consumer keeps running
 
-**Prevention (design decision):** Define two timestamps in the payload schema: `simulator_ts` (simulator-generated, stored for traceability) and `ingested_at` (server-assigned on receipt, used for all business logic and queries). Specify in the SDD data model that `ingested_at` is the authoritative time column. Mark `simulator_ts` as informational only.
+**Detection during dev:** Expose pool status in a debug endpoint:
+```python
+@app.get("/debug/pool")
+def pool_status():
+    return {"checked_out": engine.pool.checkedout(), "overflow": engine.pool.overflow()}
+```
+
+**Prevention:**
+- Always use `try/finally: db.close()` pattern — never rely on garbage collection for sessions
+- Keep the MQTT thread pool workers ≤ pool_size / 2 (max 5 workers for pool_size=10)
+- Add `pool_timeout=10` to `create_engine` to fail fast instead of hanging on pool exhaustion
 
 ---
 
-### 🟡 MODERATE — IoT-5: No Reconnect / Backoff Strategy → Thundering Herd on Broker Restart
+### 🟡 MODERATE — MQTT-4: aiomqtt Reconnect Loop Not Cancellable → Hangs on Shutdown
 
-**What goes wrong:** The simulator and backend MQTT client both reconnect immediately on disconnect. After a broker restart, hundreds of clients simultaneously reconnect and re-subscribe, overloading the broker at startup. In a simulated classroom environment (multiple students running brokers), this causes cascading failures.
+**What goes wrong:** aiomqtt's recommended reconnect pattern uses a `while True` loop with `asyncio.sleep()`:
+```python
+async def mqtt_consumer_task():
+    while True:
+        try:
+            async with aiomqtt.Client("mosquitto") as client:
+                async for message in client.messages:
+                    await handle_message(message)
+        except aiomqtt.MqttError:
+            await asyncio.sleep(5)  # reconnect delay
+```
+When FastAPI shuts down and calls `task.cancel()`, the `CancelledError` is raised inside `asyncio.sleep()`.
+If the outer `while True` catches it with a bare `except Exception`, the task ignores cancellation and never exits.
+`uvicorn` then hangs for 5 seconds waiting for the task to finish.
 
-**Warning sign:** Reconnect logic in simulator is `client.reconnect()` with no delay.
+**Warning sign:** `docker compose stop api` takes >5 seconds. Logs show `Waiting for background tasks...`.
 
-**Prevention (design decision):** Specify in the SDD that both the simulator and the backend MQTT client must implement exponential backoff with jitter on reconnect: `delay = min(2^attempt * base_ms + random_jitter_ms, max_delay_ms)`. Include a configuration table with `MQTT_RECONNECT_BASE_MS=500`, `MQTT_RECONNECT_MAX_MS=30000`. This is a design contract, not implementation — the SDD should include it in the IoT component spec.
+**Prevention:** Catch `CancelledError` explicitly and re-raise it:
+```python
+async def mqtt_consumer_task():
+    while True:
+        try:
+            async with aiomqtt.Client("mosquitto") as client:
+                async for message in client.messages:
+                    await handle_message(message)
+        except asyncio.CancelledError:
+            raise          # let the task terminate cleanly
+        except aiomqtt.MqttError as e:
+            logger.warning(f"MQTT disconnected: {e}. Reconnecting in 5s...")
+            await asyncio.sleep(5)
+```
 
 ---
 
-### 🟡 MODERATE — IoT-6: No Payload Schema Validation → Malformed Data Silently Stored
+### 🟡 MODERATE — MQTT-5: Session Created Outside Try/Finally → Connection Leak on Exception
 
-**What goes wrong:** Simulator publishes JSON with missing fields, wrong types, or extra keys. Backend stores raw values without validation. AI feature engineering then receives `null` or unexpected string values, produces `NaN` health scores, and the system either crashes or silently shows incorrect predictions.
+**What goes wrong:** When a malformed MQTT payload causes a `ValueError` during parsing, the SQLAlchemy session
+is never closed if the exception is raised before `db.close()`:
+```python
+def _write_to_db(payload_str: str):
+    db = SessionLocal()
+    data = json.loads(payload_str)    # can raise ValueError
+    reading = SensorReading(**data)   # can raise TypeError
+    db.add(reading)
+    db.commit()
+    db.close()  # NEVER REACHED if exception above
+```
+After enough bad payloads, the connection pool is exhausted.
 
-**Warning sign:** Ingestion handler calls `json.loads(payload)` and accesses keys directly without validation.
+**Prevention:** Always use context manager or try/finally:
+```python
+def _write_to_db(payload_str: str):
+    db = SessionLocal()
+    try:
+        data = json.loads(payload_str)
+        db.add(SensorReading(**data))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to write sensor reading: {e}")
+    finally:
+        db.close()
+```
 
-**Prevention (design decision):** Define a formal MQTT payload schema in the SDD (use a table or JSON Schema block, not prose). Example:
-```json
-{
-  "asset_id": "string (UUID)",
-  "sensor_type": "temperature | humidity | power | vibration | running_hours",
-  "value": "number",
-  "unit": "string",
-  "simulator_ts": "ISO 8601 string"
+---
+
+## WebSocket Pitfalls
+
+### 🔴 CRITICAL — WS-1: ConnectionManager.broadcast() Raises on First Dead Connection, Silencing All Others
+
+**What goes wrong:** The standard ConnectionManager broadcast pattern iterates over active connections:
+```python
+async def broadcast(self, data: str):
+    for connection in self.active_connections:
+        await connection.send_text(data)  # RAISES if connection is dead
+```
+When a client disconnects ungracefully (browser tab closed, network drop), the `WebSocket` object stays in
+`active_connections` but `send_text()` raises `WebSocketDisconnect` or `RuntimeError`. The exception
+**stops the loop** — all connections after the dead one never receive the broadcast.
+
+**Warning sign:** Some clients stop receiving updates after another client disconnects. No explicit error for the working clients.
+
+**Detection during dev:** Open 3 browser tabs on the IoT monitoring page. Force-close one tab. Observe that the remaining tabs stop updating.
+
+**Prevention:** Wrap each send in try/except and collect disconnected clients for removal:
+```python
+async def broadcast(self, data: str):
+    dead = []
+    for connection in self.active_connections:
+        try:
+            await connection.send_text(data)
+        except Exception:
+            dead.append(connection)
+    for conn in dead:
+        self.active_connections.remove(conn)
+```
+
+---
+
+### 🔴 CRITICAL — WS-2: active_connections List Has No asyncio.Lock → Race Condition on Concurrent Connect/Disconnect
+
+**What goes wrong:** `connect()`, `disconnect()`, and `broadcast()` all modify/read `active_connections` concurrently
+in the async event loop. While Python's GIL prevents data corruption, `list.remove()` during iteration in
+`broadcast()` raises `ValueError` if a disconnect happens mid-broadcast. Under high connection churn (users
+navigating between pages on the IoT Monitoring view), this creates intermittent `ValueError: list.remove(x): x not in list` errors.
+
+**Warning sign:** Occasional 500 errors in WebSocket disconnect logs, especially when multiple clients are active.
+
+**Prevention:** Protect the list with an `asyncio.Lock`:
+```python
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+        self._lock = asyncio.Lock()
+
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        async with self._lock:
+            self.active_connections.append(ws)
+
+    async def disconnect(self, ws: WebSocket):
+        async with self._lock:
+            self.active_connections.discard(ws)  # use a set, not a list
+
+    async def broadcast(self, data: str):
+        async with self._lock:
+            connections = list(self.active_connections)  # snapshot
+        # iterate snapshot outside lock
+        dead = []
+        for conn in connections:
+            try:
+                await conn.send_text(data)
+            except Exception:
+                dead.append(conn)
+        if dead:
+            async with self._lock:
+                for conn in dead:
+                    self.active_connections.discard(conn)
+```
+Use a `set` instead of a `list` for O(1) removal.
+
+---
+
+### 🔴 CRITICAL — WS-3: MQTT Handler Calls broadcast() Across asyncio Task Boundary Without Safety
+
+**What goes wrong:** The MQTT consumer task and the WebSocket connections live in the same event loop, but they
+are different coroutines. If the MQTT consumer calls `connection_manager.broadcast()` directly from the thread
+executor (via `run_in_executor`), it calls an async method from a sync thread — this raises:
+`RuntimeError: no running event loop` or silently drops the call.
+
+**Warning sign:** Messages are written to the database correctly but WebSocket clients never receive updates.
+
+**Prevention:** Call `broadcast()` only from async context. When using `run_in_executor` for DB writes, keep
+the broadcast in the async caller:
+```python
+async def handle_message(payload: dict):
+    # DB write in thread (sync SQLAlchemy)
+    await asyncio.get_event_loop().run_in_executor(_thread_pool, _write_to_db, payload)
+    # Broadcast from async context
+    await connection_manager.broadcast(json.dumps(payload))
+```
+
+---
+
+### 🟡 MODERATE — WS-4: WebSocket Endpoint Accepts Connections After App Shutdown
+
+**What goes wrong:** When uvicorn begins shutdown, the FastAPI lifespan context starts tearing down. But
+WebSocket connections that are already open remain open — uvicorn does not force-close them. New connections
+during the shutdown window are accepted, then immediately dropped when the server exits, leaving clients in
+a reconnect loop.
+
+**Prevention:** In the lifespan shutdown phase, close all active WebSocket connections before yielding:
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(mqtt_consumer_task())
+    yield
+    # Shutdown
+    task.cancel()
+    await connection_manager.close_all()  # send close frame to all clients
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+```
+
+---
+
+### 🟡 MODERATE — WS-5: Next.js useEffect Creates Two Connections in React StrictMode
+
+**What goes wrong:** Next.js 15 uses React 18+ StrictMode by default, which **double-invokes `useEffect`**
+in development to detect side-effects. A WebSocket connection opened in `useEffect` is opened twice — the
+first instance is never cleaned up because the cleanup function only closes the second instance:
+```tsx
+useEffect(() => {
+  const ws = new WebSocket("ws://localhost:8000/ws/sensors");
+  ws.onmessage = (e) => setReadings(JSON.parse(e.data));
+  // No cleanup — both connections stay open
+}, []);
+```
+This causes two identical streams of sensor data, double-rendering chart updates, and leaves zombie
+connections on the server.
+
+**Warning sign:** Server logs show 2 WebSocket connections per browser tab in development. Chart updates
+flicker or stutter.
+
+**Detection during dev:** Add `console.log("WS open")` in the `onopen` handler — you'll see it logged twice per mount.
+
+**Prevention:** Always return a cleanup function:
+```tsx
+useEffect(() => {
+  const ws = new WebSocket("ws://localhost:8000/ws/sensors");
+  ws.onmessage = (e) => setReadings(JSON.parse(e.data));
+  return () => {
+    ws.close();  // cleanup closes the connection on unmount/StrictMode re-run
+  };
+}, []); // empty deps = connect once on mount
+```
+
+---
+
+### 🟡 MODERATE — WS-6: No Reconnect Logic in Next.js Client → Permanent Disconnect After Brief Outage
+
+**What goes wrong:** If the FastAPI server restarts (e.g., hot reload from `--reload` flag in dev, or Docker
+restart), the WebSocket connection drops. Without reconnect logic, the IoT Monitoring page shows stale/frozen
+data permanently — the user has to manually refresh the page.
+
+**Warning sign:** After `docker compose restart api`, the IoT Monitoring charts stop updating until page reload.
+
+**Prevention:** Add exponential backoff reconnect:
+```tsx
+function useReconnectingWebSocket(url: string) {
+  const wsRef = useRef<WebSocket | null>(null);
+  const retryDelay = useRef(1000);
+
+  const connect = useCallback(() => {
+    const ws = new WebSocket(url);
+    ws.onopen = () => { retryDelay.current = 1000; }; // reset on success
+    ws.onclose = () => {
+      setTimeout(() => {
+        retryDelay.current = Math.min(retryDelay.current * 2, 30000);
+        connect();
+      }, retryDelay.current);
+    };
+    wsRef.current = ws;
+    return ws;
+  }, [url]);
+
+  useEffect(() => {
+    const ws = connect();
+    return () => ws.close();
+  }, [connect]);
+
+  return wsRef;
 }
 ```
-Specify that the backend validates against this schema on ingest and rejects (logs + discards) invalid payloads. Valid/invalid counts are exposed as metrics.
 
 ---
 
-## 2. AI / ML Pitfalls (Predictive Maintenance, Synthetic Data, Approval Workflow)
+### 🟢 MINOR — WS-7: Unbounded Reading History in React State → Memory Leak
 
-### 🔴 CRITICAL — AI-1: Model Trained on Perfectly Regular Synthetic Data → Zero Generalization
-
-**What goes wrong:** The simulator generates sensor values with smooth sinusoidal patterns or linear degradation curves. The AI model trains on this data, achieves 99% accuracy, and appears to work in demo. When real sensor data is used (or when the simulator is run with different random seeds), the model fails completely. For an academic project, the grader may alter simulator parameters to test the system — the model breaks.
-
-**Warning sign:** Simulator always generates the same failure pattern (e.g., "temperature rises 0.5°C per hour until failure at 85°C"). Training data has no noise, no anomalous but non-failure readings, no gradual drift.
-
-**Prevention (design decision):** The SDD must specify the simulator's noise model alongside its publish schema:
-- Add a `noise_std_dev` parameter per sensor type
-- Add a `random_failure_injection` flag that randomly inserts out-of-distribution readings unrelated to failure
-- Specify that the AI training section uses data from at least 3 simulator runs with different seeds
-
-Include a note in the AI Architecture section: "Model must generalize to unseen simulator seeds. A temporal train/test split (train on months 1-3, test on month 4) is required. Random splits are prohibited due to temporal autocorrelation."
-
----
-
-### 🔴 CRITICAL — AI-2: No Temporal Train/Test Split → Data Leakage Inflates Metrics
-
-**What goes wrong:** The team uses `train_test_split(shuffle=True)` from scikit-learn. Because sensor readings are time-correlated (reading at T+1 depends on reading at T), shuffled splits allow future readings to appear in the training set. The model implicitly learns future states and reports artificially high accuracy. The system looks production-ready in the SDD review but fails in demo when real-time data flows.
-
-**Warning sign:** AI Architecture section says "80/20 random split." No mention of temporal ordering.
-
-**Prevention (design decision):** Specify in the AI Architecture section: "Training/validation split is strictly temporal: the first 70% of chronological readings form the training set, the next 15% form validation, the final 15% form the test set. No shuffling. This is a hard constraint on the ML pipeline contract."
-
----
-
-### 🔴 CRITICAL — AI-3: Manager Approval Gate Is Decoration, Not a State Machine Gate
-
-**What goes wrong:** The approval workflow is described in the SDD as "Manager sees recommendation and clicks Approve or Defer." But no state machine is defined. The backend has no enforcement: a Staff member can call the approve endpoint directly, or the maintenance record is created before Manager approval, or approval creates a duplicate maintenance record. The gate exists in the UI only.
-
-**Warning sign:** SDD approval workflow section says "Manager can approve" but has no state transition table. No mention of who can call the approval API, what the pre-condition states are, or what happens if approval is rejected.
-
-**Prevention (design decision):** Define the predictive maintenance recommendation state machine explicitly in the SDD:
+**What goes wrong:** Each WebSocket message appends to a React state array:
+```tsx
+const [readings, setReadings] = useState<Reading[]>([]);
+ws.onmessage = (e) => setReadings(prev => [...prev, JSON.parse(e.data)]);
 ```
-PENDING_REVIEW → APPROVED (by Manager/Admin) → MAINTENANCE_CREATED
-PENDING_REVIEW → DEFERRED (by Manager/Admin) → [re-evaluated at next AI run]
-PENDING_REVIEW → EXPIRED (if SLA countdown elapses without action) → escalation notification
+After 1 hour at 2 messages/second = 7,200 readings in state. Recharts re-renders all 7,200 points.
+Memory grows unbounded; the tab becomes sluggish after ~30 minutes.
+
+**Prevention:** Cap to a rolling window:
+```tsx
+ws.onmessage = (e) => setReadings(prev => {
+  const next = [...prev, JSON.parse(e.data)];
+  return next.slice(-100); // keep last 100 readings per sensor
+});
 ```
-Specify: only roles `Manager` and `Admin` may transition `PENDING_REVIEW → APPROVED`. The backend enforces this with RBAC middleware — not just UI hiding.
 
 ---
 
-### 🟡 MODERATE — AI-4: Health Score Opaque → Manager Approval Is Theater
+## Database Performance Pitfalls
 
-**What goes wrong:** The AI outputs a health score (e.g., 0.72) and a failure risk band (High/Medium/Low). The Manager sees the number but has no context: What does 0.72 mean? What pushed it to "High"? Without explainability, Managers either rubber-stamp every recommendation (defeating the gate's purpose) or reject all of them (AI provides no value).
+### 🔴 CRITICAL — DB-1: Missing Composite Index on (asset_id, recorded_at) → Slow Time-Range Queries
 
-**Warning sign:** AI Architecture section describes outputs as `{ health_score: float, risk_band: string }` with no contributing factors or feature importance breakdown.
-
-**Prevention (design decision):** Specify in the AI output contract that every recommendation includes:
-```json
-{
-  "health_score": 0.72,
-  "risk_band": "High",
-  "top_factors": [
-    { "feature": "avg_vibration_7d", "contribution": 0.45, "direction": "above_threshold" },
-    { "feature": "running_hours", "contribution": 0.31, "direction": "exceeds_recommended" }
-  ],
-  "confidence": 0.84,
-  "model_version": "v1.2.0"
-}
+**What goes wrong:** The IoT Monitoring page queries the last N readings for a specific asset:
+```sql
+SELECT * FROM sensor_readings
+WHERE asset_id = 'ASSET-001'
+ORDER BY recorded_at DESC
+LIMIT 50;
 ```
-The SDD's AI output schema section must define `top_factors` as a required field, not optional. The Manager approval screen wireframe must show these factors.
-
----
-
-### 🟡 MODERATE — AI-5: No Model Versioning → Silent Prediction Changes
-
-**What goes wrong:** The model is retrained with new data during the project. Old recommendations were made by model v1, new ones by model v2. When a Manager reviews a recommendation generated 3 days ago, the explanation shown is from the current model — not the model that generated it. The audit trail cannot reproduce why a recommendation was made. In academic evaluation, this makes it impossible to explain the system's decisions.
-
-**Warning sign:** Recommendation records store `asset_id` and `risk_score` but not `model_version`. No model artifact versioning in the design.
-
-**Prevention (design decision):** Specify in the ER diagram that the `ai_recommendations` table includes a `model_version` column (string). Define in the AI Architecture section that model artifacts are versioned (e.g., `models/predictive_maintenance_v1.pkl`) and the version string stored with every prediction. This enables reproducibility for audit review.
-
----
-
-### 🟡 MODERATE — AI-6: Class Imbalance Ignored → Model Always Predicts "Healthy"
-
-**What goes wrong:** In a simulated environment, most sensor readings indicate normal operation. If the simulator runs 1000 hours and injects 10 failure events, the training data is 99% "healthy" and 1% "at-risk." A naive classifier achieves 99% accuracy by always predicting "healthy." Health scores never reach "High" risk. Predictive maintenance module appears broken in demo.
-
-**Warning sign:** AI Architecture section has no mention of class balancing strategy. Training metrics show only accuracy, not precision/recall/F1 per class.
-
-**Prevention (design decision):** Specify in the AI Architecture section:
-1. Simulator must be configured to generate failure events at a minimum 15% rate during training data collection runs (controlled by `failure_rate` parameter).
-2. Training pipeline uses SMOTE oversampling or class-weight adjustment (`class_weight='balanced'`).
-3. Evaluation metrics reported in the SDD are F1-score and recall for the "at-risk" class — not overall accuracy.
-
----
-
-## 3. Real-time UI Pitfalls (WebSocket, Dashboard, Charts)
-
-### 🔴 CRITICAL — UI-1: WebSocket Fan-Out Every MQTT Message → Browser Firehose
-
-**What goes wrong:** The backend receives MQTT messages (10 sensors × N assets × 1 message/10 sec = manageable) and immediately broadcasts each to all connected WebSocket clients. As assets scale from 5 to 50, the dashboard receives 500+ messages/minute. React re-renders on every message. CPU usage spikes to 100% on the client. Browser tab crashes or becomes unresponsive. This is the single most common IoT dashboard performance failure.
-
-**Warning sign:** WebSocket handler calls `websocket.send(message)` directly in the MQTT `on_message` callback, with no throttling or aggregation layer.
-
-**Prevention (design decision):** Define in the Architecture section a "dashboard aggregation layer" between MQTT ingestion and WebSocket broadcast:
-- Backend aggregates sensor readings into per-asset snapshots every N seconds (configurable, default 5s)
-- WebSocket sends one aggregated message per asset per interval, not one message per sensor reading
-- Specify the WebSocket message schema: `{ asset_id, timestamp, sensors: { temperature: {...}, vibration: {...} } }` — all sensors in one message per asset, not separate messages per sensor
-
----
-
-### 🟡 MODERATE — UI-2: Chart Re-Renders on Every Data Point → UI Jank
-
-**What goes wrong:** A time-series chart (e.g., Recharts `<LineChart>`) is placed in a React component that receives the full dataset as a prop. Every new sensor reading appends to the dataset array and triggers a full chart re-render. For a 24-hour history with 6 readings/minute, that's 8640 points. The chart recalculates all 8640 points on every new reading. Frame rates drop below 15fps. The dashboard looks broken.
-
-**Warning sign:** Chart component receives a growing array from state. No `useMemo`, no windowing, no max-points cap.
-
-**Prevention (design decision):** Specify in the UI Architecture section:
-1. Time-series charts display a **rolling window** only: last 60 readings (configurable `CHART_WINDOW_SIZE`).
-2. Chart dataset is capped at `CHART_WINDOW_SIZE` in the state update function — older points are discarded.
-3. Specify `React.memo` on chart components to prevent re-renders unrelated to the sensor's own data stream.
-This should appear in the Frontend Architecture constraints section of the SDD.
-
----
-
-### 🟡 MODERATE — UI-3: No Stale Data Indicator → Silent Staleness After Disconnection
-
-**What goes wrong:** The WebSocket disconnects (broker restart, network blip). The frontend displays the last received sensor values indefinitely. Users see temperature "72°C" with no indication it was received 10 minutes ago. Operators make decisions based on stale readings. In a demo, the presenter doesn't notice the dashboard froze.
-
-**Warning sign:** Dashboard UI design shows only the current sensor value. No "last updated" timestamp or connection status indicator in the wireframes.
-
-**Prevention (design decision):** Specify in every sensor dashboard wireframe:
-1. A `"Last updated: Xs ago"` label next to each sensor value
-2. Sensor value card turns amber after 30s without update, red after 60s
-3. A WebSocket connection status badge (green/amber/red) in the dashboard header
-Define these as a UI design rule in the Design System section: "Stale data must always be visually indicated. Never display sensor data without a timestamp."
-
----
-
-### 🟡 MODERATE — UI-4: Browser Memory Leak from Unbounded Time-Series State
-
-**What goes wrong:** The frontend stores all sensor readings received since the session started. After 2 hours of use (common during a demo or grading session), the in-memory store holds 72,000+ readings. React state updates slow down. The browser tab eventually crashes (OOM). This is invisible in 5-minute dev tests.
-
-**Warning sign:** Frontend state for sensor history is an array that only grows — no eviction or windowing.
-
-**Prevention (design decision):** Specify in the Frontend Architecture section: "Sensor history in browser state is bounded to `CHART_WINDOW_SIZE` entries per sensor per asset. New readings replace old readings using a ring buffer pattern. The backend is the source of truth for historical data; the frontend holds only the display window."
-
----
-
-### 🟢 MINOR — UI-5: WebSocket Reconnection Not Handled
-
-**What goes wrong:** The browser's native WebSocket does not automatically reconnect after disconnection. When the broker restarts or the server redeploys, the dashboard shows stale data silently (see UI-3). No error is shown to the user.
-
-**Warning sign:** WebSocket initialization in the component is `new WebSocket(url)` with no reconnection logic.
-
-**Prevention (design decision):** Specify in the SDD Frontend section that the WebSocket client library implements reconnect with exponential backoff. Recommend `reconnecting-websocket` or an equivalent pattern. Define the reconnect behavior in the component contract: "Attempts reconnect up to 10 times with base 1s, max 30s backoff. Displays 'Reconnecting...' status during attempts."
-
----
-
-## 4. Design-Phase Pitfalls (SDD Production)
-
-### 🔴 CRITICAL — DESIGN-1: SDD Describes Implementation Instead of Contracts
-
-**What goes wrong:** The SDD author writes SQL DDL statements, Python function signatures, and React component props directly in the document. The document becomes 150+ pages. Readers skip sections. The implementation diverges from the document because implementation details are wrong (guessed) or become outdated. The SDD's value — communicating design intent — is destroyed.
-
-**Warning sign:** The SDD has sections titled "Implementation Details" or includes code blocks with type annotations, variable names, or database migrations.
-
-**Prevention (design decision):** Enforce a document scope rule at the start of the SDD authoring process: "This document defines contracts and constraints, not implementations. Permitted content: interface tables, state machines, data flow diagrams, conceptual ER diagrams, component responsibility descriptions. Prohibited: code blocks, SQL DDL, function signatures, file paths with line numbers."
-
----
-
-### 🔴 CRITICAL — DESIGN-2: RBAC Defined Vaguely → Implementation Diverges
-
-**What goes wrong:** The SDD says "Manager can approve maintenance recommendations" and "Staff cannot access Admin functions." Without an explicit permission matrix, each developer interprets "Admin functions" differently. The backend enforces one set of rules, the frontend hides a different set, and the API layer enforces yet another set. During integration, inconsistencies cause either over-permission (security risk) or under-permission (feature broken).
-
-**Warning sign:** The SDD User Roles section lists role descriptions in prose paragraphs with no table mapping roles to specific actions.
-
-**Prevention (design decision):** Include a mandatory permission matrix table in the SDD with every module as a column and every role as a row. Use symbols: ✓ (full access), 👁 (read-only), ✗ (no access), 🔒 (approval required). Example partial:
-
-| Action | Admin | Manager | Staff |
-|---|---|---|---|
-| View asset list | ✓ | ✓ | ✓ |
-| Create/edit asset | ✓ | ✓ | ✗ |
-| Approve AI recommendation | ✓ | ✓ | ✗ |
-| View audit log | ✓ | 👁 | ✗ |
-| Manage users | ✓ | ✗ | ✗ |
-
-This table is the authoritative contract. Backend and frontend are both bound to it.
-
----
-
-### 🔴 CRITICAL — DESIGN-3: IoT Pipeline Described in Prose, Not Data Flow Diagram
-
-**What goes wrong:** The SDD IoT Architecture section says "The simulator publishes data to the MQTT broker, which the backend subscribes to, processes the data, and updates the dashboard." This sentence hides 5 critical design decisions: async vs sync processing, message buffering, WebSocket aggregation, error handling path, and persistence order. Two developers reading the same prose will build different systems.
-
-**Warning sign:** IoT architecture section has no diagram. All pipeline steps are in a numbered list.
-
-**Prevention (design decision):** Require a formal data flow diagram (DFD or sequence diagram) in the IoT Architecture section. The diagram must show:
-1. Simulator → MQTT Broker (with topic name)
-2. MQTT Broker → Backend Subscriber (with QoS level)
-3. Backend → Validation → Async Queue
-4. Async Worker → PostgreSQL (persistence)
-5. Async Worker → WebSocket Hub → Frontend
-6. Error path: invalid payload → Dead Letter Log
-
-No prose description is acceptable as a substitute for this diagram.
-
----
-
-### 🟡 MODERATE — DESIGN-4: Conceptual ER Diagram Includes SQL Implementation Details
-
-**What goes wrong:** The SDD ER diagram includes column types (`VARCHAR(255)`, `TIMESTAMP WITH TIME ZONE`), foreign key constraint syntax (`REFERENCES assets(id) ON DELETE CASCADE`), and index definitions. When the implementation team uses a different ORM or database dialect, they change these details and the SDD is immediately stale. The document becomes a maintenance liability.
-
-**Warning sign:** ER diagram section is titled "Database Schema" and includes SQL CREATE TABLE statements.
-
-**Prevention (design decision):** Label the section "Conceptual Entity Model" and restrict content to: entity names, attribute names and semantic types (`id: UUID`, `created_at: datetime`, `status: enum`), and relationship cardinalities. No SQL syntax. No constraint definitions. No index design.
-
----
-
-### 🟡 MODERATE — DESIGN-5: Business Rules for Edge Cases Left Implicit
-
-**What goes wrong:** The SDD defines the happy path for the AI approval workflow but omits edge cases: What happens to a `PENDING_REVIEW` recommendation when the asset is retired? What if the same asset has two concurrent `PENDING_REVIEW` recommendations? What if the Manager defers indefinitely and the SLA countdown never expires? These gaps are discovered during implementation and resolved inconsistently by different developers.
-
-**Warning sign:** Business Workflow section has only happy-path BPMN flows. No "error flows" or "exception handling" branches.
-
-**Prevention (design decision):** For every state machine in the SDD, include an edge case table:
-
-| Scenario | Current State | Trigger | Result |
-|---|---|---|---|
-| Asset retired | PENDING_REVIEW | Asset status → retired | Recommendation auto-cancelled, notification sent |
-| Duplicate recommendation | — | AI generates new recommendation | Previous PENDING_REVIEW auto-superseded |
-| SLA elapsed | PENDING_REVIEW | Timer fires | Status → EXPIRED, escalation notification |
-
-This table is compact and high-value. Require it for every workflow with a state machine.
-
----
-
-### 🟢 MINOR — DESIGN-6: Notification Center "Types" Undefined → Frontend Guesses Layout
-
-**What goes wrong:** The SDD says "Notification Center shows alerts for high failure risk, warranty expiry, and overdue returns." The frontend designer creates three different notification card layouts (one per type). The backend generates notifications with slightly different structures per type. Integration requires rework.
-
-**Warning sign:** Notification section lists notification types by name but has no shared schema or severity model.
-
-**Prevention (design decision):** Define a unified notification schema in the SDD:
+Without a composite index, this requires a **full table scan** on `sensor_readings`. At 10 sensors × 12
+readings/hour × 100 assets = 12,000 rows/hour, after one week = 2M rows. Query time degrades from
+<1ms to >500ms. Dashboard latency becomes noticeable within the first week of dev testing.
+
+**Warning sign:** The Alembic migration creates the `sensor_readings` table with only a primary key index.
+`EXPLAIN ANALYZE` shows `Seq Scan` on `sensor_readings`.
+
+**Detection during dev:**
+```sql
+EXPLAIN ANALYZE
+SELECT * FROM sensor_readings WHERE asset_id = 'ASSET-001'
+ORDER BY recorded_at DESC LIMIT 50;
 ```
-{
-  "id": UUID,
-  "type": "HIGH_FAILURE_RISK | WARRANTY_EXPIRY | OVERDUE_RETURN | ...",
-  "severity": "CRITICAL | WARNING | INFO",
-  "entity_type": "asset | assignment | ...",
-  "entity_id": UUID,
-  "message": string,
-  "created_at": datetime,
-  "read_at": datetime | null
-}
+Look for `Seq Scan` — means the index is missing.
+
+**Prevention:** Add in the Alembic migration:
+```python
+# In alembic migration
+op.create_index(
+    "ix_sensor_readings_asset_recorded",
+    "sensor_readings",
+    ["asset_id", "recorded_at"],
+)
+# Also a standalone index on recorded_at for global time-range queries
+op.create_index(
+    "ix_sensor_readings_recorded_at",
+    "sensor_readings",
+    ["recorded_at"],
+)
 ```
-All notification types share this schema. The `type` field drives frontend icon/color treatment; the `severity` field drives sort order. One card component handles all types.
 
 ---
 
-## 5. Academic Project-Specific Pitfalls
+### 🔴 CRITICAL — DB-2: Unbounded sensor_readings Growth → Disk Fills, Queries Slow
 
-### 🔴 CRITICAL — ACAD-1: Scope Creep from Integration-Level AI to Full MLOps Pipeline
+**What goes wrong:** The table grows indefinitely. At 10 sensors × 2 readings/min × 100 assets = 2,000
+rows/min = 2.88M rows/day. A Docker volume on a dev laptop fills up within days. No production-viable
+system would let sensor data grow indefinitely, but for v2.1 the dev environment needs a retention policy
+or the Docker PostgreSQL volume becomes a problem within 1–2 days of active development.
 
-**What goes wrong:** The team starts designing the AI architecture and gets drawn into model training infrastructure: MLflow experiment tracking, feature stores, hyperparameter optimization, model serving with versioned endpoints, A/B testing. This is fascinating engineering but consumes the entire time budget. The SDD is 60% AI pipeline design and 40% everything else. Core features (Audit Log, User Management, RBAC) get one-page descriptions. The grader scores the system as incomplete.
+**Warning sign:** `docker system df` shows the postgres_data volume growing rapidly. `pg_database_size()`
+increases by hundreds of MB per hour.
 
-**Warning sign:** AI Architecture section is longer than all other sections combined. SDD review meeting spends 45 minutes on model training and 5 minutes on IoT pipeline.
-
-**Prevention (design decision):** Set a hard scope boundary in the SDD preface: "AI integration scope is inference-only. The system calls a pre-trained model artifact (`.pkl` or ONNX file). Model training, experiment tracking, and MLOps infrastructure are out of scope for v1.2. Training is done once offline using the simulator data generator." Reference this boundary in every AI-adjacent section to prevent scope drift.
-
----
-
-### 🔴 CRITICAL — ACAD-2: Simulator Realism Over SDD Quality
-
-**What goes wrong:** The team spends 3 weeks perfecting the simulator (realistic vibration FFT patterns, correlated sensor degradation, stochastic failure injection) and 3 days writing the SDD. The simulator is impressive in isolation but the SDD lacks component boundaries, permission matrices, and workflow diagrams. In academic review, the SDD is graded — not the simulator.
-
-**Warning sign:** Team meeting agendas focus on simulator parameters. SDD is "being worked on in parallel" but no sections are draft-complete.
-
-**Prevention (design decision):** Lock simulator scope to minimum viable fidelity: 5 sensor types, configurable publish interval, configurable failure rate, configurable noise. Define these in the SDD's "IoT Simulator Specification" section as a 1-page table. Treat the simulator as a supporting tool for the SDD, not a deliverable in its own right.
-
----
-
-### 🟡 MODERATE — ACAD-3: Over-Engineering the Stack for a 3-Month Academic Project
-
-**What goes wrong:** The architecture design includes Apache Kafka for message streaming, Redis for real-time pub/sub, TimescaleDB for time-series, Celery with multi-worker queues, and Kubernetes deployment. Each component adds operational complexity and integration surface area. In a 3-month project, the team spends 70% of time on infrastructure wiring and 30% on actual features. The demo shows a Kubernetes dashboard, not asset management workflows.
-
-**Warning sign:** Architecture diagram has more infrastructure components than application modules. The rationale for each component is "we might need to scale later."
-
-**Prevention (design decision):** Apply the "minimum viable stack" rule in the SDD: choose the simplest component that fulfills the functional requirement.
-
-| Requirement | Minimum Viable Choice | Over-Engineering |
-|---|---|---|
-| MQTT message queue | MQTT QoS 1 + async FastAPI handler | Kafka |
-| Async task processing | FastAPI BackgroundTasks | Celery + Redis |
-| Time-series storage | PostgreSQL with `ingested_at` index | TimescaleDB |
-| WebSocket broadcasting | FastAPI WebSocket manager | Redis pub/sub |
-| Auth | JWT + RBAC middleware | OIDC/SSO |
-
-Document these choices with explicit "why not" rationale so team members stop relitigating them.
+**Prevention:** Add a scheduled cleanup or a simple `LIMIT 10,000` retention as part of the Alembic
+migration or seed setup:
+```sql
+-- Run periodically (can be a FastAPI scheduled task or manual):
+DELETE FROM sensor_readings
+WHERE recorded_at < NOW() - INTERVAL '7 days';
+```
+For dev: set simulator publish interval to 10–30 seconds (not 1 second) to control row growth rate.
 
 ---
 
-### 🟡 MODERATE — ACAD-4: "Simulated" Scope Not Documented → Grader Misalignment
+### 🟡 MODERATE — DB-3: No Index on sensor_type → Slow Filtering by Sensor Category
 
-**What goes wrong:** The SDD describes a production-grade IoT system with real sensor hardware integration. The actual implementation uses a Python script that generates fake data. When the grader asks "can we plug in a real temperature sensor?", the team has no documented answer. If the SDD promised real IoT, the project is graded as incomplete.
+**What goes wrong:** The IoT Monitoring page filters readings by sensor type (temperature, vibration, power).
+Without an index on `sensor_type`, these filters also require full table scans:
+```sql
+SELECT * FROM sensor_readings WHERE asset_id = ? AND sensor_type = 'temperature'
+ORDER BY recorded_at DESC LIMIT 100;
+```
 
-**Warning sign:** SDD IoT Architecture section says "IoT sensors publish telemetry" without a "Simulation Boundary" callout box.
-
-**Prevention (design decision):** Include a clearly labeled "System Boundary" section in the SDD with a callout:
-> **Simulation Boundary:** This system uses a software-based IoT Sensor Simulator to generate synthetic telemetry data. Real hardware sensor integration is architecturally supported (via the defined MQTT topic schema) but is outside the v1.2 scope. The simulator is the sole data source for all IoT-dependent features.
-
-This single paragraph prevents scope ambiguity in grading, demos, and future implementation phases.
-
----
-
-### 🟡 MODERATE — ACAD-5: No "Definition of Done" for SDD Sections → Review Is Fuzzy
-
-**What goes wrong:** The team submits an SDD for review. Different reviewers (team members, supervisor, grader) have different expectations. One reviewer thinks "Architecture section" means a diagram; another thinks it means a prose description. Without criteria, feedback is subjective ("this section feels thin") and revisions are infinite.
-
-**Warning sign:** SDD review sessions produce comments like "we should add more here" without specifying what "more" means. Revision cycles don't converge.
-
-**Prevention (design decision):** Define acceptance criteria for each SDD section in a "Document Standards" page:
-
-| Section | Done When |
-|---|---|
-| System Architecture | Has: component diagram, component responsibility table, communication protocol table |
-| RBAC | Has: role descriptions + permission matrix table |
-| IoT Architecture | Has: data flow diagram, topic schema table, payload schema, QoS specification |
-| AI Architecture | Has: pipeline diagram, input/output contract table, model boundary, approval state machine |
-| ER Diagram | Has: all entities, all relationships with cardinality, all key attributes |
-| Wireframes | Has: all 8 modules, all role variants, annotated with component names |
+**Prevention:** Add to the Alembic migration:
+```python
+op.create_index(
+    "ix_sensor_readings_type",
+    "sensor_readings",
+    ["asset_id", "sensor_type", "recorded_at"],  # covering index
+)
+```
 
 ---
 
-### 🟢 MINOR — ACAD-6: Audit Log Treated as "Just a Table" → Business Value Lost
+### 🟡 MODERATE — DB-4: INSERT-Per-Message at High Frequency → Write Amplification
 
-**What goes wrong:** The Audit Log section says "all actions are logged to an `audit_events` table." No immutability guarantee, no specification of what constitutes an "event" (every DB write? Only business actions?), no AI recommendation linkage. During grading, the grader asks "show me the audit trail for this maintenance approval" and the team can't filter by correlation.
+**What goes wrong:** At 2 readings/second with 5 sensors, that is 10 individual `INSERT` statements per
+second. Each INSERT is a separate transaction with a full WAL write. PostgreSQL handles this fine for dev
+(it can sustain thousands of TPS), but it is inefficient and causes unnecessary lock contention under load.
+More importantly, each INSERT is also triggering a WebSocket broadcast — if the broadcast takes >50ms
+(which it can at high WebSocket client counts), the insert queue backs up.
 
-**Warning sign:** Audit Log section is one paragraph. No event taxonomy. No `correlation_id` defined.
+**Warning sign:** MQTT handler processes messages synchronously. No batching.
 
-**Prevention (design decision):** Define an audit event taxonomy in the SDD:
-
-| Category | Example Events |
-|---|---|
-| Asset lifecycle | asset.created, asset.assigned, asset.returned, asset.retired |
-| Maintenance | maintenance.scheduled, maintenance.completed |
-| AI | ai.recommendation.generated, ai.recommendation.approved, ai.recommendation.deferred |
-| Security | user.login, user.role_changed, permission.denied |
-| IoT | sensor.alert.triggered, iot.connection.lost |
-
-Specify: every event includes `correlation_id` (linking AI → approval → maintenance → notification). Specify immutability: `audit_events` rows are insert-only (no UPDATE, no DELETE). This makes the audit trail a defensible design decision, not an afterthought.
+**Prevention:** For v2.1 dev scale, single inserts are acceptable. Add a note in the code:
+```python
+# NOTE: Single-row INSERTs are acceptable at dev scale (≤10 sensors, 5s intervals).
+# For production scale, use batch INSERT with asyncio.Queue accumulator + 1s flush interval.
+```
+Simulator should publish at 5–10 second intervals (not 1 second) to avoid this becoming a problem.
 
 ---
 
-## Summary Table
+### 🟡 MODERATE — DB-5: `SELECT *` from sensor_readings → Unnecessary Column Fetch
 
-| ID | Category | Severity | Problem | Prevention |
-|----|----------|----------|---------|------------|
-| IoT-1 | IoT | 🔴 | MQTT QoS 0 message loss | Specify QoS 1 + dedup by message_id |
-| IoT-2 | IoT | 🔴 | No topic naming convention | Define topic hierarchy in SDD contract |
-| IoT-3 | IoT | 🔴 | Simulator floods ingest | Specify publish interval + async ingest |
-| IoT-4 | IoT | 🟡 | Clock drift / timestamp ordering | Two timestamps: simulator_ts + ingested_at |
-| IoT-5 | IoT | 🟡 | No reconnect backoff | Specify exponential backoff in component spec |
-| IoT-6 | IoT | 🟡 | No payload schema validation | Define formal payload schema + reject policy |
-| AI-1 | AI/ML | 🔴 | Model trained on clean synthetic data | Specify noise + failure injection in simulator spec |
-| AI-2 | AI/ML | 🔴 | Random train/test split → data leakage | Mandate temporal split in AI pipeline contract |
-| AI-3 | AI/ML | 🔴 | Approval gate not a state machine | Define full state machine with RBAC enforcement |
-| AI-4 | AI/ML | 🟡 | Health score opaque | Require top_factors in AI output contract |
-| AI-5 | AI/ML | 🟡 | No model versioning | Include model_version in recommendation schema |
-| AI-6 | AI/ML | 🟡 | Class imbalance ignored | Specify 15% failure rate + balanced training |
-| UI-1 | Real-time UI | 🔴 | WebSocket firehose | Aggregation layer: one msg/asset/interval |
-| UI-2 | Real-time UI | 🟡 | Chart re-renders on every point | Specify rolling window + React.memo |
-| UI-3 | Real-time UI | 🟡 | No stale data indicator | Require timestamp + color state in wireframes |
-| UI-4 | Real-time UI | 🟡 | Browser memory leak | Bounded ring buffer in Frontend Architecture |
-| UI-5 | Real-time UI | 🟢 | No WebSocket reconnect | Specify reconnect library + backoff |
-| DESIGN-1 | SDD Design | 🔴 | SDD describes impl, not contracts | Scope rule: no code blocks, no SQL DDL |
-| DESIGN-2 | SDD Design | 🔴 | RBAC vague → divergence | Mandatory permission matrix table |
-| DESIGN-3 | SDD Design | 🔴 | IoT pipeline in prose only | Require formal data flow diagram |
-| DESIGN-4 | SDD Design | 🟡 | ER diagram includes SQL | Conceptual entity model only |
-| DESIGN-5 | SDD Design | 🟡 | Edge cases left implicit | Edge case table for every state machine |
-| DESIGN-6 | SDD Design | 🟢 | Notification schema undefined | Unified notification schema in SDD |
-| ACAD-1 | Academic | 🔴 | Scope creep to MLOps | Hard boundary: inference-only, no training infra |
-| ACAD-2 | Academic | 🔴 | Simulator over SDD quality | Lock simulator scope to 1-page spec |
-| ACAD-3 | Academic | 🟡 | Over-engineering stack | Minimum viable stack table with "why not" rationale |
-| ACAD-4 | Academic | 🟡 | Simulated scope undocumented | "Simulation Boundary" callout in SDD |
-| ACAD-5 | Academic | 🟡 | No definition of done | Per-section acceptance criteria table |
-| ACAD-6 | Academic | 🟢 | Audit log undertreated | Event taxonomy + correlation_id + immutability |
+**What goes wrong:** The WebSocket broadcast serializes full `SensorReading` ORM objects. If the model
+has many columns (raw_payload JSON, metadata fields, etc.), `SELECT *` fetches all of them even if
+the WebSocket payload only needs `asset_id`, `sensor_type`, `value`, `unit`, `recorded_at`.
+
+**Prevention:** Use targeted queries in the WebSocket broadcast path:
+```python
+from sqlalchemy import select
+result = db.execute(
+    select(
+        SensorReading.asset_id,
+        SensorReading.sensor_type,
+        SensorReading.value,
+        SensorReading.unit,
+        SensorReading.recorded_at,
+    )
+    .where(SensorReading.asset_id == asset_id)
+    .order_by(SensorReading.recorded_at.desc())
+    .limit(50)
+)
+```
+
+---
+
+## Docker/Mosquitto Pitfalls
+
+### 🔴 CRITICAL — DOCKER-1: Mosquitto 2.x Requires Explicit Listener Config — Silent Connection Refused
+
+**What goes wrong:** Mosquitto 2.x changed the default configuration: **anonymous connections and default
+listeners are disabled by default**. An `eclipse-mosquitto:2` container with no config file starts
+successfully (no error in container logs), but all connection attempts are refused with:
+`Connection refused: not authorised` or `Connection refused: error`. The aiomqtt client and simulator
+both fail silently (or log a cryptic `[Errno 111] Connection refused`). The developer spends time
+debugging the Python code when the issue is in the broker config.
+
+**Warning sign:** `docker compose up` shows Mosquitto container as `Up (healthy)` but aiomqtt client
+logs `Connection refused` or never connects.
+
+**Detection:** 
+```bash
+docker exec mosquitto mosquitto_pub -h localhost -t test -m "hello"
+# If this fails with "Connection Refused", the config is wrong
+```
+
+**Prevention:** Mount a `mosquitto.conf` in Docker Compose:
+```yaml
+# docker-compose.yml
+mosquitto:
+  image: eclipse-mosquitto:2
+  volumes:
+    - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+  ports:
+    - "1883:1883"
+```
+```ini
+# mosquitto/config/mosquitto.conf
+listener 1883
+allow_anonymous true
+```
+Without `listener 1883`, Mosquitto 2.x binds to localhost only (not accessible from other containers).
+Without `allow_anonymous true`, all connections are refused.
+
+---
+
+### 🔴 CRITICAL — DOCKER-2: FastAPI API Container Starts Before Mosquitto Is Ready
+
+**What goes wrong:** Docker Compose `depends_on` only guarantees container **start order**, not **readiness**.
+The `api` container starts, the lifespan function launches the `mqtt_consumer_task()`, which immediately
+tries to connect to `mosquitto:1883` — but Mosquitto hasn't finished binding its port yet. aiomqtt raises
+`MqttError: Connection refused`. The consumer task exits (or enters the reconnect loop), and if the reconnect
+logic isn't robust, sensor data is never consumed.
+
+**Warning sign:** First 5–10 seconds of `docker compose up` show `MQTT connection refused` errors in the
+api service logs.
+
+**Prevention:**
+1. Add a Mosquitto healthcheck to Docker Compose:
+```yaml
+mosquitto:
+  image: eclipse-mosquitto:2
+  healthcheck:
+    test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "healthcheck", "-m", "ping", "-q"]
+    interval: 5s
+    timeout: 3s
+    retries: 5
+```
+2. Add `depends_on: mosquitto: condition: service_healthy` to the `api` service.
+3. **Also** implement reconnect with backoff in the MQTT consumer (healthcheck alone is not enough for transient post-startup disconnects):
+```python
+async def mqtt_consumer_task():
+    while True:
+        try:
+            async with aiomqtt.Client("mosquitto", port=1883) as client:
+                await client.subscribe("assets/+/sensors/+")
+                async for message in client.messages:
+                    await handle_message(message)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning(f"MQTT consumer error: {e}. Retrying in 5s...")
+            await asyncio.sleep(5)
+```
+
+---
+
+### 🟡 MODERATE — DOCKER-3: Mosquitto Config Volume Not Mounted → Default Config Used Silently
+
+**What goes wrong:** A common mistake when first adding Mosquitto to Docker Compose is specifying the
+volume path incorrectly. The container starts with the default empty config, Mosquitto 2.x refuses all
+connections, and the error is `Connection Refused` rather than `File not found` — making it appear to
+be a network issue.
+
+**Warning sign:** `docker exec mosquitto cat /mosquitto/config/mosquitto.conf` returns empty or
+`No such file or directory`.
+
+**Prevention:** Verify the volume mount after first `docker compose up`:
+```bash
+docker exec mosquitto cat /mosquitto/config/mosquitto.conf
+# Should show: listener 1883 / allow_anonymous true
+```
+
+---
+
+### 🟡 MODERATE — DOCKER-4: Simulator Depends On Both Mosquitto AND API — Wrong depends_on Order
+
+**What goes wrong:** The Python sensor simulator publishes to Mosquitto directly (not via the FastAPI API).
+If it is configured with `depends_on: [api]`, it waits for the api but not necessarily for Mosquitto.
+If it is configured with `depends_on: [mosquitto]`, it starts as soon as the Mosquitto container starts —
+before Mosquitto is ready to accept connections. The simulator's first batch of publishes is lost.
+
+**Prevention:** Simulator should depend on Mosquitto's healthcheck, not just its startup:
+```yaml
+simulator:
+  depends_on:
+    mosquitto:
+      condition: service_healthy
+```
+Add a retry loop in the simulator's publish logic (same pattern as the API consumer).
+
+---
+
+### 🟢 MINOR — DOCKER-5: No Persistent Volume for Mosquitto → In-Flight Messages Lost on Restart
+
+**What goes wrong:** Without a persistence volume, Mosquitto stores QoS 1 retained messages in memory only.
+If the broker container restarts, all queued messages and retained state are lost. For a dev environment
+this is acceptable, but it's a footgun if the team assumes QoS 1 guarantees delivery across restarts.
+
+**Prevention:** For v2.1 dev, this is acceptable — document it:
+```yaml
+# docker-compose.yml comment:
+# mosquitto has no persistent volume — QoS 1 retained messages are lost on broker restart.
+# Acceptable for v2.1 dev environment. Add mosquitto_data volume for production.
+```
+
+---
+
+## Prevention Strategies
+
+### Strategy A: Use `run_in_executor` for All DB Writes in MQTT Handler
+
+Keep the existing sync SQLAlchemy and psycopg2 stack. Offload blocking writes to a thread pool:
+
+```python
+# app/services/mqtt_handler.py
+import asyncio
+import json
+import logging
+from concurrent.futures import ThreadPoolExecutor
+
+from app.database import SessionLocal
+from app.models.sensor_reading import SensorReading
+
+logger = logging.getLogger(__name__)
+_db_thread_pool = ThreadPoolExecutor(max_workers=4)
+
+
+def _persist_reading(payload: dict) -> SensorReading | None:
+    """Runs in thread pool — safe to use sync SQLAlchemy here."""
+    db = SessionLocal()
+    try:
+        reading = SensorReading(
+            asset_id=payload["asset_id"],
+            sensor_type=payload["sensor_type"],
+            value=float(payload["value"]),
+            unit=payload.get("unit", ""),
+        )
+        db.add(reading)
+        db.commit()
+        db.refresh(reading)
+        return reading
+    except Exception as e:
+        db.rollback()
+        logger.error(f"DB write failed: {e}")
+        return None
+    finally:
+        db.close()
+
+
+async def handle_mqtt_message(message) -> dict | None:
+    """Called from async MQTT consumer — dispatches DB write to thread pool."""
+    try:
+        payload = json.loads(message.payload)
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        logger.warning(f"Malformed MQTT payload on {message.topic}: {e}")
+        return None
+
+    loop = asyncio.get_event_loop()
+    reading = await loop.run_in_executor(_db_thread_pool, _persist_reading, payload)
+    return payload if reading else None
+```
+
+---
+
+### Strategy B: Safe ConnectionManager Pattern
+
+```python
+# app/services/connection_manager.py
+import asyncio
+import json
+from fastapi import WebSocket
+
+class ConnectionManager:
+    def __init__(self):
+        self._connections: set[WebSocket] = set()
+        self._lock = asyncio.Lock()
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        async with self._lock:
+            self._connections.add(websocket)
+
+    async def disconnect(self, websocket: WebSocket):
+        async with self._lock:
+            self._connections.discard(websocket)
+
+    async def broadcast_json(self, data: dict):
+        async with self._lock:
+            snapshot = set(self._connections)
+        dead: set[WebSocket] = set()
+        for conn in snapshot:
+            try:
+                await conn.send_text(json.dumps(data, default=str))
+            except Exception:
+                dead.add(conn)
+        if dead:
+            async with self._lock:
+                self._connections -= dead
+
+    async def close_all(self):
+        async with self._lock:
+            snapshot = set(self._connections)
+        for conn in snapshot:
+            try:
+                await conn.close()
+            except Exception:
+                pass
+        async with self._lock:
+            self._connections.clear()
+```
+
+---
+
+### Strategy C: Alembic Migration Index Checklist
+
+In the `sensor_readings` migration, always include:
+
+```python
+def upgrade() -> None:
+    op.create_table(
+        "sensor_readings",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("asset_id", sa.String(50), sa.ForeignKey("assets.id"), nullable=False),
+        sa.Column("sensor_type", sa.String(50), nullable=False),
+        sa.Column("value", sa.Float(), nullable=False),
+        sa.Column("unit", sa.String(20), nullable=True),
+        sa.Column("recorded_at", sa.DateTime(timezone=True),
+                  server_default=sa.func.now(), nullable=False),
+    )
+    # Index 1: per-asset time-series queries (most common)
+    op.create_index("ix_sensor_readings_asset_recorded",
+                    "sensor_readings", ["asset_id", "recorded_at"])
+    # Index 2: per-asset per-type time-series (for sensor type filtering)
+    op.create_index("ix_sensor_readings_asset_type_recorded",
+                    "sensor_readings", ["asset_id", "sensor_type", "recorded_at"])
+    # Index 3: global time-range queries (retention cleanup)
+    op.create_index("ix_sensor_readings_recorded_at",
+                    "sensor_readings", ["recorded_at"])
+```
+
+---
+
+### Strategy D: Mosquitto Docker Compose Checklist
+
+```yaml
+# docker-compose.yml additions
+mosquitto:
+  image: eclipse-mosquitto:2
+  restart: unless-stopped
+  ports:
+    - "1883:1883"
+  volumes:
+    - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+  healthcheck:
+    test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "healthcheck", "-m", "ping", "-q"]
+    interval: 5s
+    timeout: 3s
+    retries: 5
+    start_period: 5s
+
+api:
+  depends_on:
+    db:
+      condition: service_healthy
+    mosquitto:               # ADD THIS
+      condition: service_healthy
+
+simulator:
+  depends_on:
+    mosquitto:
+      condition: service_healthy
+```
+
+```ini
+# mosquitto/config/mosquitto.conf
+listener 1883
+allow_anonymous true
+# persistence false  # acceptable for dev
+# log_type all       # enable for debugging connection issues
+```
 
 ---
 
 ## Phase-Specific Warnings
 
-| SDD Section Being Written | Most Likely Pitfall | Mitigation |
-|---|---|---|
-| IoT Architecture | IoT-3 (simulator floods), IoT-2 (no topic convention) | Write topic schema + publish interval table first |
-| AI Architecture | AI-2 (data leakage), AI-3 (gate not enforced) | Temporal split + approval state machine are mandatory |
-| Real-time Dashboard Wireframes | UI-1 (firehose), UI-3 (no stale indicator) | Aggregation architecture before wireframe |
-| User Roles & Permissions | DESIGN-2 (vague RBAC) | Permission matrix table, not prose |
-| ER Diagram | DESIGN-4 (SQL in diagram) | Conceptual only — no types, no constraints |
-| Business Workflows | DESIGN-5 (no edge cases) | Edge case table for AI approval and overdue return |
-| Scope Definition | ACAD-1 (MLOps creep), ACAD-4 (real IoT expectation) | Simulation Boundary callout + inference-only boundary |
+| Phase | Topic | Pitfall to Watch | Mitigation |
+|-------|-------|-----------------|------------|
+| **1. Mosquitto + Docker Compose** | Adding broker service | DOCKER-1: No config → silent connection refused | Mount `mosquitto.conf` with `listener 1883` + `allow_anonymous true` before testing |
+| **1. Mosquitto + Docker Compose** | Service ordering | DOCKER-2: API starts before broker ready | Add healthcheck + `depends_on: condition: service_healthy` |
+| **2. sensor_readings migration** | Alembic migration | DB-1: Missing composite index | Include all 3 indexes in migration (see Strategy C) |
+| **2. sensor_readings migration** | Table design | DB-2: Unbounded growth | Set simulator interval to ≥10s; add retention comment |
+| **3. aiomqtt consumer** | lifespan integration | MQTT-2: Consumer as BackgroundTask | Use `asyncio.create_task()` in lifespan, not BackgroundTasks |
+| **3. aiomqtt consumer** | Async/sync boundary | MQTT-1: Sync SQLAlchemy blocks event loop | Use `run_in_executor` for all DB writes (see Strategy A) |
+| **3. aiomqtt consumer** | Reconnect logic | MQTT-4: Reconnect not cancellable | Re-raise `CancelledError` in reconnect loop |
+| **3. aiomqtt consumer** | Session management | MQTT-5: Session leak on exception | Always use try/finally for `db.close()` |
+| **4. WebSocket endpoint** | ConnectionManager | WS-1: Dead connection breaks broadcast | Wrap each send in try/except (see Strategy B) |
+| **4. WebSocket endpoint** | Concurrency | WS-2: List race condition | Use `asyncio.Lock` + `set` for connections |
+| **4. WebSocket endpoint** | Thread boundary | WS-3: broadcast() from thread | Keep broadcast in async context, not in run_in_executor |
+| **4. WebSocket endpoint** | Shutdown | WS-4: Connections open after shutdown | `close_all()` in lifespan teardown |
+| **5. Python simulator** | Publish rate | DB-4: Too many inserts | Enforce `PUBLISH_INTERVAL_SEC` env var default 10s |
+| **5. Python simulator** | Docker readiness | DOCKER-4: Starts before broker ready | `depends_on: mosquitto: condition: service_healthy` + retry |
+| **6. Next.js IoT page** | useEffect | WS-5: StrictMode double connection | Return `() => ws.close()` from every useEffect |
+| **6. Next.js IoT page** | Reconnect | WS-6: No reconnect after server restart | Implement exponential backoff reconnect hook |
+| **6. Next.js IoT page** | Memory | WS-7: Unbounded readings state | Cap state array to rolling window (`slice(-100)`) |
+
+---
+
+## Quick Diagnostic Checklist
+
+Run these checks during development to catch pitfalls early:
+
+```bash
+# 1. Verify Mosquitto config is loaded
+docker exec mosquitto cat /mosquitto/config/mosquitto.conf
+
+# 2. Test Mosquitto accepts connections
+docker exec mosquitto mosquitto_pub -h localhost -t test -m "hello" -q
+
+# 3. Check DB connection pool (add debug endpoint first)
+curl http://localhost:8000/debug/pool
+
+# 4. Verify sensor_readings indexes exist
+docker exec -it <pg_container> psql -U postgres -d asset_management -c \
+  "SELECT indexname FROM pg_indexes WHERE tablename = 'sensor_readings';"
+
+# 5. Check for event loop blocking (add to MQTT handler temporarily)
+import time
+start = time.monotonic()
+# ... db write ...
+elapsed = time.monotonic() - start
+if elapsed > 0.05:
+    logger.warning(f"DB write took {elapsed:.3f}s — may be blocking event loop")
+
+# 6. Verify WebSocket broadcast reaches all clients
+# Open browser DevTools Network tab → WS → check Messages stream
+# Disconnect one tab → verify remaining tabs still receive messages
+```
 
 ---
 
 ## Sources
 
-- Production IoT system post-mortems: MQTT message loss patterns, QoS misconfiguration  
-- ML engineering best practices: temporal validation splits, class imbalance for maintenance prediction  
-- React performance patterns: WebSocket throttling, chart rendering optimization  
-- Academic software project failure modes: scope creep, overconfident AI metrics, stack over-engineering  
-- Confidence: HIGH — patterns are well-established and cross-verified across IoT, ML, and UI engineering literature
+- FastAPI documentation: lifespan events, WebSocket patterns, BackgroundTasks scope
+- aiomqtt documentation: Client context manager, reconnect patterns
+- SQLAlchemy 2.0 documentation: sync session lifecycle, connection pool configuration
+- asyncio documentation: run_in_executor, CancelledError handling, Lock
+- Mosquitto 2.x documentation: listener configuration, breaking changes from 1.x
+- React documentation: useEffect cleanup, StrictMode double-invocation behavior
+- PostgreSQL documentation: index types, EXPLAIN ANALYZE, connection pooling
+- Confidence: HIGH — all patterns verified against actual v2.0 codebase (sync SQLAlchemy confirmed in database.py, lifespan verified in main.py)

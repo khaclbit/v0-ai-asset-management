@@ -1,387 +1,312 @@
-# Technology Stack
+# IoT Stack Additions
 
-**Project:** Smart AI-Powered Asset Management System (v1.2 IoT Design Milestone)
-**Researched:** 2026-06-28
-**Scope:** SDD-level design stack — IoT + AI + Web for university academic project
-**Confidence:** HIGH (all versions verified from npm/PyPI registries, 2026-06-28)
+**Project:** AI Asset Management System — v2.1 IoT Pipeline  
+**Researched:** 2026-07-05  
+**Scope:** Additions only — existing FastAPI 0.115.5 + SQLAlchemy 2.0 (sync) + PostgreSQL 16 stack unchanged
 
 ---
 
-## Stack Overview
+## MQTT Client
 
+**Recommendation: `aiomqtt==2.5.1`**
+
+| Property | Value |
+|----------|-------|
+| Package | `aiomqtt` |
+| Version | `2.5.1` (latest as of 2026-07-05) |
+| PyPI | https://pypi.org/project/aiomqtt/ |
+| Requires Python | >=3.8, <4.0 — compatible with Python 3.12 |
+| Dependency | pulls in `paho-mqtt>=2.1.0,<3.0.0` automatically |
+| No extra deps | for Python 3.11+ (no `typing-extensions` needed) |
+
+**Why `aiomqtt` over alternatives:**
+
+| Package | Version | Status | Verdict |
+|---------|---------|--------|---------|
+| **aiomqtt** | 2.5.1 | Active, async-first | **CHOOSE THIS** |
+| paho-mqtt | 2.1.0 | Sync-only; callback-based | Requires `loop.run_in_executor()` wrappers — ugly in FastAPI lifespan |
+| gmqtt | 0.7.0 | Last release 2021; unmaintained | AVOID |
+
+`aiomqtt` is an idiomatic asyncio wrapper around the battle-tested `paho-mqtt` engine. It uses
+`async with aiomqtt.Client() as client:` and `async for message in client.messages:` — both patterns
+integrate naturally into FastAPI's `asynccontextmanager` lifespan. No callbacks, no threads,
+no monkey-patching.
+
+**Installation addition to `requirements.txt`:**
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  FRONTEND                                                   │
-│  React 19 + TypeScript 5 + Material UI v6 + Recharts 2     │
-│  Vite 6 (build) · React Router 6 · Zustand · React Query   │
-└────────────────────────┬────────────────────────────────────┘
-                         │ REST/HTTP (Axios)
-┌────────────────────────▼────────────────────────────────────┐
-│  BACKEND API                                                │
-│  FastAPI 0.115+ · SQLAlchemy 2.0 · Alembic 1.18            │
-│  PyJWT 2.13 · Passlib 1.7 · Uvicorn 0.34                   │
-└──────────┬──────────────────────────┬───────────────────────┘
-           │ psycopg2                  │ paho-mqtt subscribe
-┌──────────▼──────────┐  ┌────────────▼──────────────────────┐
-│  PostgreSQL 16      │  │  Mosquitto MQTT Broker 2.x        │
-│  (pgAdmin optional) │  │  eclipse-mosquitto:2              │
-└─────────────────────┘  └────────────┬──────────────────────┘
-                                      │ paho-mqtt publish
-┌─────────────────────────────────────▼──────────────────────┐
-│  IOT SIMULATOR (Python)                                     │
-│  paho-mqtt 2.1 · random / time · JSON payloads             │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│  AI/ML WORKER (Python)                                      │
-│  scikit-learn 1.5 · XGBoost 2.1 · pandas 2.2 · joblib 1.4  │
-│  Triggered by FastAPI background tasks                      │
-└─────────────────────────────────────────────────────────────┘
-┌─────────────────────────────────────────────────────────────┐
-│  DEPLOYMENT                                                 │
-│  Docker Compose 3.9 · 5 services                           │
-└─────────────────────────────────────────────────────────────┘
+aiomqtt==2.5.1
 ```
+*(paho-mqtt 2.1.0 is pulled in automatically as a transitive dep — do not pin it separately)*
 
 ---
 
-## Recommended Stack
+## WebSocket
 
-### Frontend
+**No new package needed.**
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| React | 19.x (19.2.7) | UI framework | Current stable; Concurrent Mode enabled; no breaking change from v18 SPA patterns |
-| TypeScript | 5.x (5.7+) | Type safety | Avoid TS 6.x — too new, fewer tutorials, same SDD value with TS 5 |
-| Material UI (`@mui/material`) | v6.x (6.5.0) | Component library | v6 is stable, MD3-aligned, Emotion-based (simpler than Pigment CSS in v7+). v5 is also acceptable — patterns are identical |
-| `@emotion/react` + `@emotion/styled` | 11.14.x | MUI peer dep | Required by MUI v6; zero config with Vite |
-| Recharts | 2.x (2.15.4) | Charting | v2 is the most documented, widest tutorial coverage. v3 exists but has fewer examples — avoid for a uni project |
-| Vite | 6.x (6.4.3) | Build tool | Fast HMR, zero-config TypeScript, replaces CRA. v8 is latest but v6 is the stable "previous" with more ecosystem support |
-| React Router DOM | 6.x (6.28+) | Client routing | v6 is the stable SPA standard; v7 is framework-mode (server-side) — avoid for plain SPA |
-| Zustand | 5.x (5.0.14) | Client state | Minimal boilerplate, no Provider wrapping needed. Use for UI state only (auth token, filters, sidebar) |
-| TanStack React Query | 5.x (5.101.x) | Server state | Handles loading/error/cache for API calls. Eliminates `useEffect`+`useState` fetch patterns |
-| Axios | 1.x (1.18.1) | HTTP client | Interceptors for JWT attach/refresh; better than raw `fetch` for enterprise patterns |
-
-**What NOT to use in frontend:**
-- `Redux` / `Redux Toolkit` — overkill for this scope; Zustand + React Query covers all needs
-- `Next.js` — SSR is not needed; SPA with Vite is simpler for a design-first academic project
-- `MUI v5` Emotion vs `MUI v7+` Pigment CSS — stick with v6 Emotion; simpler mental model
-
----
-
-### Backend API
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| FastAPI | 0.115.x (latest: 0.138.1) | Web framework | Async-native, auto-generates OpenAPI docs, Pydantic v2 built in. Fastest Python API framework for IoT ingestion patterns |
-| Pydantic | v2 (ships with FastAPI) | Request/response validation | v2 is 5–50× faster than v1; model validation handles JSON sensor payloads cleanly |
-| SQLAlchemy | 2.0.x (2.0.51) | ORM | 2.0 style (`select()` syntax) with type annotations. Use sync engine + `psycopg2` for simplicity in a uni project |
-| Alembic | 1.18.x (1.18.5) | DB migrations | Official SQLAlchemy migration tool. Autogenerate migrations from model diffs |
-| psycopg2-binary | 2.9.x (2.9.12) | PostgreSQL driver | Synchronous driver, zero-config with SQLAlchemy 2.0. Use `asyncpg` only if you need full async DB — complexity not warranted here |
-| PyJWT | 2.x (2.13.0) | JWT generation/validation | Actively maintained; `python-jose` is stale (last updated 2022). Use PyJWT for access + refresh tokens |
-| Passlib | 1.7.x (1.7.4) | Password hashing | `bcrypt` backend via Passlib. Industry-standard; no alternative needed |
-| python-multipart | 0.0.32 | Form data / file upload | Required by FastAPI for file upload endpoints (OCR intake) |
-| python-dotenv | 1.x (1.2.2) | Environment config | Loads `.env` files for Docker Compose secret injection |
-| Uvicorn | 0.34.x (0.49.0 latest) | ASGI server | Production-grade ASGI server; use with `--workers 1` for uni docker setup |
-| httpx | 0.28.x | Async HTTP client | Used in FastAPI background tasks to call AI worker endpoints if separated |
-
-**ORM Pattern Decision: SQLAlchemy 2.0 sync over async**
-
-> For a university project with a single worker, synchronous SQLAlchemy with psycopg2 is correct. The complexity cost of `async_session_maker` + `asyncpg` is not justified unless IoT ingestion rate exceeds ~500 messages/second. Design the schema as if async were planned (no blocking ORM calls in route bodies), but implement sync for the SDD.
-
----
-
-### Database
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| PostgreSQL | 16.x | Primary datastore | JSONB for sensor payloads (schema-flexible), TimescaleDB-compatible if telemetry grows, strong transactional guarantees |
-| pgAdmin | 4.x (optional) | DB GUI | Docker Compose sidekick for development; helps students inspect tables without CLI |
-
-**Schema design notes for IoT data:**
-- Store normalized asset/user/maintenance records in relational tables.
-- Store raw MQTT sensor payloads as `JSONB` in a `sensor_readings` table with a `device_id`, `timestamp`, and `payload` column.
-- Add a `predictions` table (asset_id, predicted_failure_date, confidence_score, model_version, created_at).
-- Alembic migrations are the only way schema changes are applied — no manual `ALTER TABLE` in SDD diagrams.
-
----
-
-### IoT Layer
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Eclipse Mosquitto | 2.x (Docker: `eclipse-mosquitto:2`) | MQTT broker | Lightweight, battle-tested, Docker-native, zero-config for local QoS 0/1 patterns |
-| paho-mqtt (Python) | 2.x (2.1.0) | MQTT client (publisher + subscriber) | Official Eclipse Paho client. v2 API changed `on_connect` callback signatures from v1 — use v2 patterns exclusively |
-
-**MQTT Integration Pattern:**
-
-```
-IoT Simulator (Python)
-  └─ paho-mqtt Client (publisher)
-       └─ Topic: assets/{device_id}/telemetry
-            └─ Payload: {"device_id": "...", "temperature": 72.3,
-                         "cpu_load": 0.45, "timestamp": "ISO-8601"}
-            
-Mosquitto Broker (port 1883)
-  └─ Subscribers receive published messages
-  
-FastAPI Backend (MQTT Subscriber Worker)
-  └─ paho-mqtt Client in background thread
-       └─ on_message() → parse JSON → write to sensor_readings table
-       └─ Trigger prediction check if reading exceeds threshold
-```
-
-**Topic naming convention:** `assets/{device_id}/telemetry` for sensor data, `assets/{device_id}/alerts` for backend-to-device commands (if needed).
-
-**QoS Level:** Use QoS 1 (at-least-once) for sensor telemetry. QoS 0 drops messages under load; QoS 2 is heavyweight for a simulator. QoS 1 is the correct balance for academic demo.
-
-**paho-mqtt v2 breaking change to document:**
-```python
-# v1 pattern (BROKEN in v2):
-def on_connect(client, userdata, flags, rc): ...
-
-# v2 pattern (CORRECT):
-def on_connect(client, userdata, flags, reason_code, properties): ...
-```
-
-**What NOT to use:**
-- MQTT over WebSockets for the IoT simulator-to-broker path — raw TCP (port 1883) is simpler
-- AMQP/RabbitMQ — heavyweight for a 3-device simulator
-- Kafka — enterprise-scale, not appropriate for a university IoT demo
-
----
-
-### AI / ML Layer
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| scikit-learn | 1.5.x (1.9.0 latest) | ML pipeline | RandomForest, preprocessing pipelines, cross-validation — all in one package. Use 1.5.x for tutorial compatibility |
-| XGBoost | 2.x (2.1.x; 3.3.0 latest) | Gradient boosting | Better than RandomForest on tabular IoT data (temperature, CPU, uptime). Use 2.x not 3.x — fewer breaking changes in examples |
-| pandas | 2.x (2.2.x) | Feature engineering | DataFrame operations for sensor data aggregation, rolling window features |
-| numpy | 1.x or 2.x | Numerical ops | pandas 2.x works with both; pick numpy 1.26.x for widest compatibility |
-| joblib | 1.4.x (1.5.3 latest) | Model persistence | Ships with scikit-learn; `joblib.dump(model, 'model.pkl')` is the standard persistence pattern |
-
-**Model Persistence Pattern:**
+FastAPI 0.115.5 depends on `starlette>=0.40.0,<0.42.0`. Starlette ships `WebSocket` and
+`WebSocketDisconnect` in its core — they are available directly via:
 
 ```python
-# Training (one-time or scheduled)
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.pipeline import Pipeline
-import joblib
-
-pipeline = Pipeline([
-    ('scaler', StandardScaler()),
-    ('clf', RandomForestClassifier(n_estimators=100, random_state=42))
-])
-pipeline.fit(X_train, y_train)
-joblib.dump(pipeline, 'models/predictive_maintenance_v1.pkl')
-
-# Serving (in FastAPI endpoint)
-pipeline = joblib.load('models/predictive_maintenance_v1.pkl')
-prediction = pipeline.predict(feature_vector)
+from fastapi import WebSocket, WebSocketDisconnect
 ```
 
-**Model Serving Pattern for FastAPI:**
-- Load model at application startup (not per request): use FastAPI `lifespan` context manager.
-- Expose a `/predict` endpoint that accepts a JSON feature vector and returns `{ "risk_score": 0.73, "recommendation": "Schedule maintenance" }`.
-- Store prediction results in `predictions` table for audit trail.
-
-**Feature Engineering for Predictive Maintenance:**
-- Rolling window features: `mean`, `std`, `max` over last 24h of temperature/CPU/voltage.
-- Days since last maintenance (from asset records in PostgreSQL).
-- Asset age in days.
-- Binary label: `will_fail_in_30_days` (for supervised training with synthetic data).
-
-**What NOT to use:**
-- TensorFlow / PyTorch — overkill for tabular IoT data; RandomForest/XGBoost achieves better results with less complexity
-- MLflow / MLOps platforms — deferred; not needed for design-only milestone
-- Online learning (incremental `partial_fit`) — adds complexity; batch retraining is sufficient for academic scope
-- Separate AI microservice — integrate as a FastAPI background task or same-process module for university simplicity
+`uvicorn[standard]==0.32.1` already installed provides the ASGI server with full WebSocket support
+(via `websockets` or `httptools`). Zero new installs required for WebSocket delivery.
 
 ---
 
-### Authentication & Authorization
+## Mosquitto Broker
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| PyJWT | 2.13.0 | JWT creation + validation | Access token (15min) + refresh token (7d) pattern |
-| Passlib + bcrypt | 1.7.4 | Password hashing | `bcrypt` rounds=12 is the standard; Passlib wraps bcrypt cleanly |
-| FastAPI `Depends` | (built-in) | RBAC enforcement | `get_current_user` dependency injected per-route; role checked against `UserRole` enum |
+**Recommendation: `eclipse-mosquitto:2.0.22`**
 
-**RBAC Roles:** `ADMIN`, `MANAGER`, `STAFF`
+| Property | Value |
+|----------|-------|
+| Docker image | `eclipse-mosquitto:2.0.22` |
+| Last pushed | 2026-06-22 (verified via Docker Hub API) |
+| Base OS | Debian slim |
+| Why not alpine variant | `2.1.2-alpine` exists but musl libc introduces edge cases; Debian build is more predictable for local dev |
+| Why not `latest` tag | `latest` is unversioned — pin to `2.0.22` for reproducible `docker compose up` |
+| Why Mosquitto 2.x | Default `allow_anonymous` changed to `false` in 2.0; explicit config is required (prevents accidental open brokers) |
 
-**JWT Flow:**
-```
-POST /auth/login → validate password → return { access_token, refresh_token }
-Authorization: Bearer <access_token>  (on every protected request)
-POST /auth/refresh → validate refresh_token → return new access_token
-```
-
-**What NOT to use:**
-- OAuth2 / OIDC external providers — over-complex for a university single-tenant system
-- Session cookies — JWT is simpler for a React SPA + REST API pattern
-- `python-jose` — maintenance stalled in 2022; replaced by PyJWT
-
----
-
-### Deployment (Docker Compose)
-
-**Service topology — 5 containers:**
-
+**Docker Compose service block:**
 ```yaml
-# docker-compose.yml topology (conceptual)
-services:
-  postgres:
-    image: postgres:16-alpine
-    environment: POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
-    volumes: postgres_data:/var/lib/postgresql/data
-    healthcheck: pg_isready
-
-  mosquitto:
-    image: eclipse-mosquitto:2
-    ports: 1883:1883
-    volumes: mosquitto.conf, data, log
-
-  backend:
-    build: ./backend
-    depends_on: [postgres, mosquitto]
-    environment: DATABASE_URL, MQTT_BROKER_HOST, JWT_SECRET
-    ports: 8000:8000
-
-  iot-simulator:
-    build: ./iot_simulator
-    depends_on: [mosquitto]
-    environment: MQTT_BROKER_HOST, DEVICE_COUNT, PUBLISH_INTERVAL_SEC
-
-  frontend:
-    build: ./frontend
-    depends_on: [backend]
-    ports: 3000:80
-    # Nginx serves Vite build artifact
+mosquitto:
+  image: eclipse-mosquitto:2.0.22
+  restart: unless-stopped
+  ports:
+    - "1883:1883"   # MQTT (simulator -> broker -> FastAPI consumer)
+    - "9001:9001"   # WebSocket MQTT (optional; only if browser MQTT clients needed)
+  volumes:
+    - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    - mosquitto_data:/mosquitto/data
+    - mosquitto_log:/mosquitto/log
 ```
 
-**Why this topology:**
-- `postgres` starts first (healthcheck gate); `backend` waits for DB readiness.
-- `mosquitto` starts independently; both `backend` (subscriber) and `iot-simulator` (publisher) connect to it.
-- `frontend` is a Nginx-served static build — NOT `npm run dev` in production.
-- `iot-simulator` is a standalone Python process that publishes every N seconds.
-- No Redis needed for a university-scale demo (rate limiting, caching deferred).
+**Recommended `mosquitto/config/mosquitto.conf`:**
+```ini
+# Mosquitto 2.0+ requires explicit listener + auth config
 
-**Mosquitto config (`mosquitto.conf`):**
-```
 listener 1883
-allow_anonymous true   # acceptable for local academic demo; document as non-prod
+allow_anonymous true
+# Dev-only: no username/password for simulator simplicity.
+# Production: replace with password_file directive.
+
 persistence true
 persistence_location /mosquitto/data/
+
 log_dest file /mosquitto/log/mosquitto.log
+log_type error
+log_type warning
+log_type notice
+log_type information
 ```
 
-**What NOT to include:**
-- Kubernetes / Helm — not appropriate for a 5-service academic demo
-- Traefik / Nginx reverse proxy for multi-domain — single-machine docker-compose is sufficient
-- Redis — add only if caching becomes a demonstrable requirement
-- Separate AI worker container — integrate AI as a FastAPI module for simplicity
+> **Note:** `allow_anonymous true` is intentional for local dev — the sensor simulator and
+> FastAPI consumer communicate on an internal Docker network with no external exposure.
+> For any environment beyond local dev, switch to `password_file` auth.
 
----
-
-## Alternatives Considered
-
-| Category | Recommended | Alternative Considered | Why Not Recommended |
-|----------|-------------|----------------------|---------------------|
-| Frontend framework | React 19 + Vite | Next.js 15 | SSR overhead not needed; SPA is simpler design for IoT dashboard |
-| UI component library | MUI v6 | Ant Design, Chakra UI | MUI has the widest Material Design 3 alignment and academic tutorial coverage |
-| Chart library | Recharts 2.x | Chart.js, Nivo, Tremor | Recharts is React-native, component-based, no canvas abstraction needed |
-| Backend framework | FastAPI | Django REST, Flask | FastAPI is async-native, auto-docs, and Pydantic v2 validation is the modern Python API standard |
-| ORM | SQLAlchemy 2.0 | Django ORM, Tortoise ORM | SQLAlchemy 2.0 is framework-agnostic and the industry standard; Django ORM ties you to Django |
-| DB driver | psycopg2-binary | asyncpg | psycopg2 is sync but simpler; asyncpg worth it only if full async stack is needed |
-| MQTT broker | Mosquitto | HiveMQ, EMQX | Mosquitto is the lightest-weight, Docker-smallest, and most-documented for local dev |
-| ML framework | scikit-learn + XGBoost | PyTorch, TensorFlow | Tabular IoT data is dominated by tree-based models; neural nets add training complexity for no accuracy gain here |
-| State management | Zustand | Redux, Context API | Zustand has minimal boilerplate; Redux is enterprise-scale overkill; raw Context causes unnecessary re-renders |
-| Auth token | JWT (PyJWT) | Sessions, python-jose | JWT is stateless and SPA-friendly; python-jose is unmaintained |
-| Client routing | React Router v6 | TanStack Router | RRv6 is the dominant documented standard; TanStack Router is more powerful but has steeper learning curve |
-
----
-
-## Version Pinning Summary
-
-```
-# requirements.txt (backend)
-fastapi==0.115.12
-pydantic==2.11.7        # ships with FastAPI
-uvicorn==0.34.0
-sqlalchemy==2.0.51
-alembic==1.18.5
-psycopg2-binary==2.9.12
-pyjwt==2.13.0
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.32
-python-dotenv==1.2.2
-paho-mqtt==2.1.0
-scikit-learn==1.5.2     # use 1.5.x not 1.9.x for tutorial stability
-xgboost==2.1.4          # use 2.x not 3.x for tutorial stability
-pandas==2.2.3
-numpy==1.26.4           # 1.26 for widest scikit/XGBoost compatibility
-joblib==1.4.2
-httpx==0.28.1
-
-# package.json (frontend)
-react: ^18.3.1           # or ^19.2.7; both acceptable
-react-dom: ^18.3.1
-typescript: ^5.7.3
-vite: ^6.4.3
-@mui/material: ^6.5.0
-@mui/icons-material: ^6.5.0
-@emotion/react: ^11.14.0
-@emotion/styled: ^11.14.1
-recharts: ^2.15.4
-react-router-dom: ^6.28.1
-zustand: ^5.0.14
-@tanstack/react-query: ^5.101.1
-axios: ^1.18.1
+**New Docker volume entries to add:**
+```yaml
+volumes:
+  postgres_data:
+  pgadmin_data:
+  mosquitto_data:    # add
+  mosquitto_log:     # add
 ```
 
-> **Version stability rationale:** Where the "latest" version shows a major jump (scikit-learn 1.9, XGBoost 3.3), the pinned version is the most recent that has broad tutorial coverage. An SDD targeting a university implementation should choose the version with the most worked examples, not the most recent patch.
+---
+
+## sensor_readings Schema
+
+**Recommended columns:**
+
+| Column | SQLAlchemy Type | Nullable | Notes |
+|--------|----------------|----------|-------|
+| `id` | `UUID` PK | No | `gen_random_uuid()` server default — matches existing model pattern |
+| `asset_id` | `UUID` FK -> `assets.id` | No | Links reading to a managed asset; `ON DELETE CASCADE` |
+| `device_id` | `String(100)` | No | MQTT client ID / sensor hardware ID; matches `assets.sensor_device_id` |
+| `metric_type` | `String(50)` | No | e.g. `"temperature"`, `"vibration"`, `"cpu_usage"`, `"battery_voltage"` |
+| `value` | `Numeric(10,4)` | No | Float-precision reading (4 decimal places covers sensor precision needs) |
+| `unit` | `String(20)` | No | e.g. `"C"`, `"g"`, `"%"`, `"V"` |
+| `timestamp` | `DateTime(timezone=True)` | No | Sensor-reported UTC time from MQTT payload; **index this** |
+| `recorded_at` | `DateTime(timezone=True)` | No | `server_default=func.now()` — when the row was persisted; for lag analysis |
+
+**Rationale for two timestamps:**
+- `timestamp` = when the sensor measured it (comes from MQTT JSON payload)
+- `recorded_at` = when PostgreSQL received it (auto-set by server)
+
+Together they enable detecting pipeline lag and out-of-order message delivery.
+
+**Indexes for Alembic migration:**
+```python
+Index("ix_sensor_readings_asset_id", "asset_id")
+Index("ix_sensor_readings_timestamp", "timestamp")
+Index("ix_sensor_readings_device_metric", "device_id", "metric_type")  # time-series queries
+```
+
+**MQTT topic convention:**
+```
+sensors/{device_id}/{metric_type}
+# e.g.: sensors/device-001/temperature
+```
+
+**MQTT payload schema (JSON):**
+```json
+{
+  "device_id": "device-001",
+  "asset_id": "550e8400-e29b-41d4-a716-446655440000",
+  "metric_type": "temperature",
+  "value": 42.7,
+  "unit": "C",
+  "timestamp": "2026-07-05T07:22:31Z"
+}
+```
 
 ---
 
-## Integration Points Between Services
+## What NOT to Add
 
-| From | To | Protocol | Data | Notes |
-|------|----|----------|------|-------|
-| IoT Simulator | Mosquitto | MQTT TCP 1883 | JSON sensor payload | QoS 1, topic `assets/{id}/telemetry` |
-| FastAPI Backend | Mosquitto | MQTT TCP 1883 | Subscribe to sensor topics | Background thread subscriber |
-| FastAPI Backend | PostgreSQL | TCP 5432 (psycopg2) | SQL queries | SQLAlchemy session per request |
-| Frontend | FastAPI Backend | HTTP/REST 8000 | JSON (Pydantic-validated) | JWT Bearer token on all protected routes |
-| FastAPI (AI module) | PostgreSQL | TCP 5432 | Read sensor_readings, write predictions | Triggered post-ingestion |
-| Docker Compose | All services | Bridge network | DNS by service name | `mosquitto`, `postgres`, `backend` as hostnames |
+| Package / Service | Why Not |
+|-------------------|---------|
+| `asyncpg` + async SQLAlchemy | The existing app uses **synchronous** `create_engine` + `sessionmaker`. Migrating to async SQLAlchemy is a separate risky refactor — out of scope for v2.1. Use `asyncio.to_thread()` for DB writes from the async MQTT consumer instead. |
+| `fastapi-mqtt` | Thin wrapper around unmaintained `gmqtt`. Adds indirection with no benefit. |
+| `redis` / Redis Streams | Overkill for single-topic MQTT fan-out to WebSocket. An in-process `asyncio.Queue` or connection set is sufficient at this scale. |
+| `celery` / task queues | No background job scheduling needed — the MQTT consumer is a long-lived `asyncio.Task` in the lifespan, not a job queue. |
+| `websockets` (standalone) | Already provided transitively via `uvicorn[standard]`. Adding it directly risks version conflicts. |
+| `gmqtt` | Last released 2021; effectively unmaintained; poor Python 3.12 compatibility. |
+| `paho-mqtt` (direct pin) | Only needed as a transitive dep via `aiomqtt`; pinning it directly is redundant and creates upgrade friction. |
+| Kafka / RabbitMQ | Enterprise message brokers — massive operational overhead for a local dev IoT demo. Mosquitto is the right fit. |
+| `httpx` / `aiohttp` | No external HTTP calls needed in the IoT pipeline. |
 
 ---
 
-## Security Considerations for IoT + AI Data Flows
+## Integration Notes
 
-### IoT Layer
-1. **MQTT anonymous allowed in dev** — document in SDD as "non-production only." Production would require TLS + username/password auth on Mosquitto.
-2. **Validate sensor payload schema** in FastAPI `on_message` handler before writing to DB — reject malformed JSON, clamp out-of-range values.
-3. **Device ID whitelist** — only accept messages from known `device_id` values to prevent spoofed sensor injection.
+### Existing architecture confirmed (from codebase inspection)
 
-### API Layer
-4. **JWT secret rotation** — inject via Docker Compose environment variable, never hardcoded.
-5. **RBAC on AI endpoints** — only `ADMIN` and `MANAGER` can view prediction results; `STAFF` sees only assigned asset status.
-6. **Input validation** — Pydantic v2 models reject unexpected fields by default (`model_config = ConfigDict(extra='forbid')`).
+- SQLAlchemy is **synchronous** (`create_engine`, `sessionmaker`, plain `Session`) — NOT async
+- The existing `lifespan` in `main.py` is already the correct hook for a background MQTT task
+- `Asset` model has `sensor_device_id: Mapped[str | None]` — the `sensor_readings.device_id` should mirror this value
 
-### AI Layer
-7. **AI output is advisory only** — predictions write to a `predictions` table; no automated maintenance order is created without `MANAGER` approval in the workflow.
-8. **Model version tracking** — store `model_version` string in the `predictions` table to trace which model produced each result.
-9. **No PII in feature vectors** — feature engineering uses device metrics only, not user identifiers.
+### Pattern: MQTT consumer inside FastAPI lifespan
+
+```python
+# app/mqtt/consumer.py
+import asyncio, json, contextlib
+import aiomqtt
+from app.database import SessionLocal
+from app.models.sensor_reading import SensorReading
+
+async def mqtt_listener(ws_manager):
+    """Long-lived task: subscribe -> parse -> write DB -> broadcast to WebSocket clients."""
+    reconnect_interval = 5  # seconds
+    while True:
+        try:
+            async with aiomqtt.Client(hostname="mosquitto", port=1883) as client:
+                await client.subscribe("sensors/#")
+                async for message in client.messages:
+                    payload = json.loads(message.payload)
+                    # DB write via thread pool (sync SQLAlchemy)
+                    await asyncio.to_thread(persist_reading, payload)
+                    # Fan-out to connected WebSocket clients
+                    await ws_manager.broadcast(payload)
+        except aiomqtt.MqttError as e:
+            print(f"MQTT disconnected: {e}. Reconnecting in {reconnect_interval}s...")
+            await asyncio.sleep(reconnect_interval)
+
+def persist_reading(payload: dict):
+    """Sync DB write — runs in thread pool via asyncio.to_thread()."""
+    with SessionLocal() as db:
+        reading = SensorReading(**payload)
+        db.add(reading)
+        db.commit()
+```
+
+```python
+# app/main.py — extend existing lifespan
+import contextlib, asyncio
+from app.mqtt.consumer import mqtt_listener
+from app.routers.iot import ws_manager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(mqtt_listener(ws_manager))
+    yield
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+```
+
+### Pattern: WebSocket ConnectionManager
+
+```python
+# app/routers/iot.py
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+router = APIRouter(prefix="/api/v1/iot", tags=["IoT"])
+
+class ConnectionManager:
+    def __init__(self):
+        self.active: list[WebSocket] = []
+
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        self.active.append(ws)
+
+    def disconnect(self, ws: WebSocket):
+        if ws in self.active:
+            self.active.remove(ws)
+
+    async def broadcast(self, data: dict):
+        for ws in list(self.active):
+            try:
+                await ws.send_json(data)
+            except Exception:
+                self.disconnect(ws)
+
+ws_manager = ConnectionManager()
+
+@router.websocket("/ws/sensor-readings")
+async def sensor_readings_ws(websocket: WebSocket):
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()  # keep-alive; client sends pings
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+```
+
+### Key design decisions
+
+1. **`asyncio.to_thread()` for DB writes** — keeps MQTT consumer non-blocking while reusing the existing sync `SessionLocal`. Zero migration risk.
+2. **In-process `ConnectionManager`** — holds active WebSocket connections as a Python list. MQTT consumer calls `await manager.broadcast(data)` after each DB write. No Redis, no pub/sub middleware.
+3. **Single background `asyncio.Task`** — the MQTT consumer runs inside the FastAPI process. Correct for this scale; avoids separate worker processes.
+4. **Reconnect loop with `asyncio.sleep()`** — `aiomqtt.MqttError` is caught; the while-True loop retries with delay so a broker restart does not crash the FastAPI API process.
+5. **`ws_manager` as module-level singleton** — imported by both `iot.py` (WebSocket routes) and `consumer.py` (MQTT listener) to share the same connection set without dependency injection complexity.
+
+### Summary: exact additions to requirements.txt
+```
+aiomqtt==2.5.1
+```
+**That is the only new Python dependency for the entire v2.1 milestone.**
+
+### Summary: Docker Compose additions
+- New service: `mosquitto` (`eclipse-mosquitto:2.0.22`)
+- New volumes: `mosquitto_data`, `mosquitto_log`
+- New bind mount: `./mosquitto/config/mosquitto.conf`
+- `api` service: add `depends_on: mosquitto`
+- New file to create: `mosquitto/config/mosquitto.conf`
 
 ---
 
 ## Sources
 
-- npm registry: https://registry.npmjs.org (verified 2026-06-28)
-- PyPI JSON API: https://pypi.org/pypi/{package}/json (verified 2026-06-28)
-- FastAPI docs: https://fastapi.tiangolo.com
-- MUI v6 docs: https://mui.com/material-ui/getting-started/
-- paho-mqtt v2 migration: https://eclipse.dev/paho/files/paho.mqtt.python/html/migrations.html
-- Mosquitto Docker: https://hub.docker.com/_/eclipse-mosquitto
-- scikit-learn model persistence: https://scikit-learn.org/stable/model_persistence.html
-- Confidence: HIGH (registry-verified versions, well-established integration patterns)
+| Source | Confidence | Notes |
+|--------|------------|-------|
+| PyPI aiomqtt 2.5.1 JSON API (live, 2026-07-05) | HIGH | `requires_python`, `requires_dist` verified |
+| PyPI paho-mqtt 2.1.0 JSON API (live, 2026-07-05) | HIGH | Confirmed as aiomqtt transitive dep |
+| PyPI gmqtt 0.7.0 JSON API (live, 2026-07-05) | HIGH | Last release confirmed; unmaintained status confirmed |
+| Docker Hub eclipse-mosquitto tags API (live, 2026-07-05) | HIGH | `2.0.22` last pushed 2026-06-22 |
+| FastAPI 0.115.5 starlette dep (live, 2026-07-05) | HIGH | WebSocket confirmed in starlette core |
+| Project codebase inspection (2026-07-05) | HIGH | Sync SQLAlchemy, lifespan pattern, `sensor_device_id` on Asset model — all confirmed |
