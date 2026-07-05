@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # CORS — comma-separated string → list parsed by validator below
     CORS_ORIGINS: str = "http://localhost:3000"
 
+    # MQTT Broker
+    # Default 'mosquitto' matches Docker Compose service name (internal DNS).
+    # Override to 'localhost' when running uvicorn directly outside Docker Compose.
+    MQTT_BROKER_HOST: str = "mosquitto"
+    MQTT_BROKER_PORT: int = 1883
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
