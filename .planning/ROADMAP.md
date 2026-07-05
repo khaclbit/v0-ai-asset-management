@@ -699,7 +699,11 @@ Plans:
   3. `GET /api/v1/iot/readings/DEV-001?metric=temperature&limit=10` returns a JSON array of up to 10 readings in descending `recorded_at` order — confirming the REST backfill endpoint
   4. `docker compose stop api && docker compose start api` — MQTT consumer restarts cleanly via lifespan without zombie tasks or `CancelledError` tracebacks in logs
 
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 33-01-PLAN.md — Foundation: ConnectionManager singleton, MQTT consumer package, SensorReadingOut schema
+- [ ] 33-02-PLAN.md — Router + Wiring: IoT router (WS + REST endpoints), lifespan task lifecycle, aiomqtt dependency
 **UI hint**: yes
 
 ---
