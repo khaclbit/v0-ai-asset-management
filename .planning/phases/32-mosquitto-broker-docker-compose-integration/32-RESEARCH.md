@@ -383,17 +383,19 @@ From direct inspection of the repository:
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should port 9001 (WebSocket MQTT) be exposed?**
    - What we know: Phase 32 scope is port 1883 (plain MQTT for simulator + consumer). No browser MQTT client is planned for v2.1.
    - What's unclear: Whether future phases will need WebSocket MQTT for browser clients.
    - Recommendation: **Omit port 9001 for Phase 32.** Adding it later requires only a `listener 9001` config line + port mapping — trivial. Adding it now without a consumer adds noise.
+   - **RESOLVED: Port 9001 omitted from Phase 32 scope. Add in v2.2+ if browser MQTT client needed.**
 
 2. **Does the `backend/.env` file (not `.env.example`) need updating?**
    - What we know: The `api` service uses `env_file: ./backend/.env` plus an `environment:` override for `MQTT_BROKER_HOST: mosquitto`.
    - What's unclear: Whether a developer's local `.env` needs updating for running outside Docker.
    - Recommendation: Add `MQTT_BROKER_HOST=localhost` and `MQTT_BROKER_PORT=1883` to `.env.example`. The plan should note that developers running the api outside Docker should copy these to their local `.env`.
+   - **RESOLVED: backend/.env gets `MQTT_BROKER_HOST=localhost` (correct for outside-Docker uvicorn dev). The value `mosquitto` only resolves inside Docker's internal network. The docker-compose.yml `environment:` block overrides this to `mosquitto` for in-Compose runs. Both cases are handled correctly without changing the .env for Docker use.**
 
 ---
 
