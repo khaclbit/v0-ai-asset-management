@@ -401,6 +401,55 @@ export interface ApiAlertRuleTestResult {
   } | null
 }
 
+// ─── Anomaly Detection types ──────────────────────────────────────────────────
+
+export interface ApiAnomalyDetection {
+  id: string
+  asset_id: string
+  sensor_device_id: string
+  window_start: string
+  window_end: string
+  model_used: string
+  is_anomaly: boolean
+  confidence: number
+  explanation: string
+  raw_response: Record<string, unknown>
+  created_at: string
+}
+
+export interface ApiAnomalySummaryItem {
+  asset_id: string
+  asset_name: string
+  total_detections: number
+  anomaly_count: number
+  last_detected_at: string | null
+}
+
+export interface ApiSystemSetting {
+  key: string
+  value: string
+}
+
+export const anomalyApi = {
+  list: (params?: { asset_id?: string; is_anomaly?: boolean; page?: number; size?: number }) =>
+    apiFetch<{ items: ApiAnomalyDetection[]; total: number; page: number; size: number }>(
+      `/anomaly-detections?${new URLSearchParams(
+        Object.entries(params ?? {})
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, String(v)])
+      )}`
+    ),
+  summary: () => apiFetch<ApiAnomalySummaryItem[]>("/anomaly-detections/summary"),
+  get: (id: string) => apiFetch<ApiAnomalyDetection>(`/anomaly-detections/${id}`),
+  runNow: () => apiFetch<{ status: string }>("/anomaly-detections/run-now", { method: "POST" }),
+  getSettings: () => apiFetch<ApiSystemSetting[]>("/system-settings/anomaly"),
+  updateSetting: (key: string, value: string) =>
+    apiFetch<ApiSystemSetting>("/system-settings/anomaly", {
+      method: "PATCH",
+      body: JSON.stringify({ key, value }),
+    }),
+}
+
 export const alertRulesApi = {
   list: (page = 1, size = 100): Promise<{ items: ApiAlertRule[]; total: number; page: number; size: number }> =>
     apiFetch(`/alert-rules?page=${page}&size=${size}`),
