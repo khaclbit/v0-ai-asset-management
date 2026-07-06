@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -49,3 +49,24 @@ class SystemSettingUpdate(BaseModel):
 
     key: str
     value: str
+
+
+# ── Response schemas added for Phase 47 ──────────────────────────────────────
+
+class AnomalyDetectionListResponse(BaseModel):
+    items: List[AnomalyDetectionRead]
+    total: int
+    page: int
+    size: int
+
+
+class AnomalyDetectionSummaryItem(BaseModel):
+    asset_id: uuid.UUID
+    asset_name: str
+    total_detections: int
+    anomaly_count: int
+    last_detected_at: Optional[datetime] = None
+
+
+class RunNowResponse(BaseModel):
+    status: str
