@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.mqtt import start_mqtt_consumer
 from app.routers import auth, assets, users, assignments, maintenance, iot, ai, notifications
+from app.routers import alert_rules, alert_events
 from app.services.websocket_manager import connection_manager
 from app.services.notification_manager import notification_manager
 
@@ -56,6 +57,8 @@ app.include_router(maintenance.router, prefix=API_PREFIX)
 app.include_router(iot.router, prefix=API_PREFIX)
 app.include_router(ai.router, prefix=API_PREFIX)
 app.include_router(notifications.router, prefix=API_PREFIX)
+app.include_router(alert_rules.router, prefix=API_PREFIX)
+app.include_router(alert_events.router, prefix=API_PREFIX)
 
 
 @app.get("/api/v1/health", tags=["Health"])
