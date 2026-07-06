@@ -153,7 +153,7 @@ export default function SettingsPage() {
                 {/* Detection Model */}
                 <div className="grid gap-2">
                   <Label htmlFor="detection-model">Detection Model</Label>
-                  <Select value={model} onValueChange={setModel}>
+                  <Select value={model} onValueChange={(v) => { if (v) setModel(v) }}>
                     <SelectTrigger id="detection-model" className="w-64">
                       <SelectValue placeholder="Select model" />
                     </SelectTrigger>
