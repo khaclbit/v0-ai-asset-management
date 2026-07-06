@@ -62,6 +62,19 @@ def _write_to_db(
         )
         db.add(reading)
         db.commit()
+
+        # ── Alert rule evaluation (REQ-ALR-03 through REQ-ALR-07) ──────────────
+        # Evaluate AFTER the reading is persisted so temporal rules can query it.
+        # Runs in the same thread-pool worker — never blocks the async MQTT loop.
+        try:
+            from app.services.alert_evaluator import evaluate_all_sync
+            evaluate_all_sync(device_id, metric, value, unit, recorded_at, db)
+        except Exception:
+            logger.exception(
+                "alert_evaluator: evaluation failed for device=%s metric=%s — ingestion unaffected",
+                device_id,
+                metric,
+            )
     except Exception:
         db.rollback()
         logger.exception(
