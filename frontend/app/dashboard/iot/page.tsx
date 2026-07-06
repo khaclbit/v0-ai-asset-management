@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Topbar } from "@/components/topbar"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -11,9 +11,11 @@ import {
   ChartLegendContent,
 } from "@/components/ui/chart"
 import { ChartEmptyState } from "@/components/ui/chart-empty-state"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useStore } from "@/lib/store"
 import { type AssetCategory } from "@/lib/data"
+import { anomalyApi } from "@/lib/api"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from "recharts"
 import { cn } from "@/lib/utils"
 import { useIotWebSocket } from "@/hooks/useIotWebSocket"
@@ -116,6 +118,20 @@ export default function IoTMonitoringPage() {
 
   const [selectedId, setSelectedId] = useState<string>(() => monitoredAssets[0]?.id ?? "")
   const [windowHours, setWindowHours] = useState(6)
+  const [anomalyMap, setAnomalyMap] = useState<Record<string, number>>({})
+
+  // Load anomaly summary on mount to show badges
+  useEffect(() => {
+    anomalyApi.summary().then((items) => {
+      const map: Record<string, number> = {}
+      for (const item of items) {
+        map[item.asset_id] = item.anomaly_count
+      }
+      setAnomalyMap(map)
+    }).catch(() => {
+      // API unavailable — badges won't show
+    })
+  }, [])
 
   const selectedAsset = monitoredAssets.find((a) => a.id === selectedId) ?? monitoredAssets[0]
 
@@ -176,6 +192,14 @@ export default function IoTMonitoringPage() {
                       <div className="truncate font-medium leading-tight">{a.name}</div>
                       <div className="text-xs text-muted-foreground">{a.category}</div>
                     </div>
+                    {anomalyMap[a.id] > 0 && (
+                      <Badge
+                        variant="outline"
+                        className="ml-auto shrink-0 border-yellow-500 bg-yellow-50 text-yellow-600 dark:bg-yellow-950/20"
+                      >
+                        ⚠ Anomaly
+                      </Badge>
+                    )}
                   </button>
                 )
               })}
