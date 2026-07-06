@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AlertTriangle, Clock3, Database, TrendingUp } from "lucide-react"
+import { AlertTriangle, Clock3, Database, TrendingUp, Activity, ChevronDown, ChevronUp, Loader2, Play } from "lucide-react"
 import { toast } from "sonner"
 
 import { AiTracePanel } from "@/components/ai-trace-panel"
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
@@ -29,7 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { aiApi, type ApiAiRecommendation } from "@/lib/api"
+import { aiApi, anomalyApi, type ApiAiRecommendation, type ApiAnomalyDetection } from "@/lib/api"
 import { CORRELATION_LABEL, formatConfidenceScore, getConfidenceBand } from "@/lib/ai-governance"
 import {
   formatSlaCountdown,
@@ -68,6 +69,12 @@ export default function AiPredictivePage() {
   const [recommendations, setRecommendations] = useState<PredictiveRecommendation[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // Anomaly Detection tab state
+  const [anomalies, setAnomalies] = useState<ApiAnomalyDetection[]>([])
+  const [anomaliesLoading, setAnomaliesLoading] = useState(true)
+  const [expandedAnomalyId, setExpandedAnomalyId] = useState<string | null>(null)
+  const [runningNow, setRunningNow] = useState(false)
+
   // Build asset lookup for name resolution
   const assetMap = useMemo(
     () => Object.fromEntries(assets.map((a) => [a.id, a.name])),
@@ -88,7 +95,30 @@ export default function AiPredictivePage() {
       .finally(() => setIsLoading(false))
   }, [])
 
+  // Load anomalies on mount
+  useEffect(() => {
+    setAnomaliesLoading(true)
+    anomalyApi
+      .list({ is_anomaly: true, size: 50 })
+      .then((data) => setAnomalies(data.items))
+      .catch(() => setAnomalies([]))
+      .finally(() => setAnomaliesLoading(false))
+  }, [])
+
+  async function handleRunNow() {
+    setRunningNow(true)
+    try {
+      await anomalyApi.runNow()
+      toast.success("Anomaly detection triggered successfully")
+    } catch {
+      toast.error("Failed to trigger anomaly detection")
+    } finally {
+      setRunningNow(false)
+    }
+  }
+
   const canAct = user?.role === "Asset Manager" || user?.role === "Admin"
+  const isAdmin = user?.role === "Admin"
 
   // Approve dialog state
   const [approveTarget, setApproveTarget] = useState<PredictiveRecommendation | null>(null)
@@ -145,7 +175,17 @@ export default function AiPredictivePage() {
     <>
       <Topbar title="AI Predictive" subtitle="ML-powered risk-ranked maintenance recommendations" />
 
-      <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <Tabs defaultValue="predictive" className="flex flex-1 flex-col">
+          <div className="border-b px-6 pt-4">
+            <TabsList>
+              <TabsTrigger value="predictive">Predictive Maintenance</TabsTrigger>
+              <TabsTrigger value="anomaly">Anomaly Detection</TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* ─── Predictive Maintenance Tab ─────────────────────────────────── */}
+          <TabsContent value="predictive" className="flex flex-1 flex-col gap-6 overflow-y-auto p-6 mt-0">
         {/* Summary Card */}
         <Card>
           <CardHeader>
@@ -337,6 +377,146 @@ export default function AiPredictivePage() {
             })}
           </div>
         </section>
+          </TabsContent>
+
+          {/* ─── Anomaly Detection Tab ──────────────────────────────────────── */}
+          <TabsContent value="anomaly" className="flex flex-1 flex-col gap-6 overflow-y-auto p-6 mt-0">
+            {/* Header row */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base font-semibold">Anomaly Detection Results</h2>
+                <p className="text-sm text-muted-foreground">
+                  {anomaliesLoading
+                    ? "Loading…"
+                    : `${anomalies.length} anomalie${anomalies.length !== 1 ? "s" : ""} detected across ${new Set(anomalies.map((a) => a.asset_id)).size} asset${new Set(anomalies.map((a) => a.asset_id)).size !== 1 ? "s" : ""}`}
+                </p>
+              </div>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={runningNow}
+                  onClick={handleRunNow}
+                >
+                  {runningNow ? (
+                    <><Loader2 className="mr-2 size-4 animate-spin" />Running…</>
+                  ) : (
+                    <><Play className="mr-2 size-4" />Run Detection Now</>
+                  )}
+                </Button>
+              )}
+            </div>
+
+            {/* Anomaly table */}
+            {anomaliesLoading ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="mr-2 size-5 animate-spin" />
+                Loading anomalies…
+              </div>
+            ) : anomalies.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+                <Activity className="size-10 opacity-40" />
+                <p>No anomalies detected recently.</p>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Asset</TableHead>
+                          <TableHead>Time Window</TableHead>
+                          <TableHead className="text-right">Confidence</TableHead>
+                          <TableHead>Model</TableHead>
+                          <TableHead>Explanation</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {anomalies.map((item) => {
+                          const isExpanded = expandedAnomalyId === item.id
+                          const assetName = assetMap[item.asset_id] ?? item.asset_id
+                          const explanationPreview = item.explanation.length > 120
+                            ? item.explanation.slice(0, 120) + "…"
+                            : item.explanation
+                          return (
+                            <>
+                              <TableRow
+                                key={item.id}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => setExpandedAnomalyId(isExpanded ? null : item.id)}
+                              >
+                                <TableCell className="font-medium">{assetName}</TableCell>
+                                <TableCell className="text-sm tabular-nums">
+                                  <span className="block">
+                                    {new Date(item.window_start).toLocaleString()}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    → {new Date(item.window_end).toLocaleString()}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {Math.round(item.confidence * 100)}%
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="font-mono text-xs">{item.model_used}</Badge>
+                                </TableCell>
+                                <TableCell className="max-w-xs">
+                                  <div className="flex items-start gap-1">
+                                    <span className="text-sm text-muted-foreground">
+                                      {isExpanded ? item.explanation : explanationPreview}
+                                    </span>
+                                    {item.explanation.length > 120 && (
+                                      <button className="ml-1 shrink-0 text-primary hover:underline" onClick={(e) => { e.stopPropagation(); setExpandedAnomalyId(isExpanded ? null : item.id) }}>
+                                        {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                                      </button>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                              {isExpanded && (
+                                <TableRow key={`${item.id}-detail`} className="bg-muted/20">
+                                  <TableCell colSpan={5}>
+                                    <div className="space-y-3 py-2 text-sm">
+                                      <p className="font-medium">Full Explanation</p>
+                                      <p className="text-muted-foreground">{item.explanation}</p>
+                                      <Separator />
+                                      <div className="grid gap-2 sm:grid-cols-3">
+                                        <div>
+                                          <p className="text-xs text-muted-foreground">Confidence</p>
+                                          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
+                                            <div
+                                              className="h-full rounded-full bg-primary"
+                                              style={{ width: `${Math.round(item.confidence * 100)}%` }}
+                                            />
+                                          </div>
+                                          <p className="mt-0.5 text-xs tabular-nums">{Math.round(item.confidence * 100)}%</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-muted-foreground">Model</p>
+                                          <p className="font-mono text-xs">{item.model_used}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-muted-foreground">Detected at</p>
+                                          <p className="text-xs">{new Date(item.created_at).toLocaleString()}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+        </Tabs>
       </div>
 
       {/* Approve Confirmation Dialog — AIPM-05 */}
