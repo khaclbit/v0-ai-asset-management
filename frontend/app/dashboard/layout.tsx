@@ -13,10 +13,12 @@ const ACCESS_DENIED_COPY = "Access denied for this module. Redirecting to dashbo
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const { user } = useStore()
+  const { user, isLoadingUser } = useStore()
   const lastDeniedPathRef = useRef<string | null>(null)
 
   useEffect(() => {
+    if (isLoadingUser) return  // wait for session rehydration before deciding
+
     if (!user) {
       lastDeniedPathRef.current = null
       router.replace("/")
@@ -39,7 +41,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     lastDeniedPathRef.current = null
-  }, [user, pathname, router])
+  }, [user, isLoadingUser, pathname, router])
+
+  if (isLoadingUser) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        Loading…
+      </div>
+    )
+  }
 
   if (!user) {
     return (

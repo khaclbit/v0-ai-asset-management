@@ -16,8 +16,8 @@ import {
 } from "@/lib/data"
 import { canTransitionMaintenance, requiresBlockedNote } from "@/lib/maintenance-warranty"
 import { decideAssignmentApproval, type AssignmentApprovalResult } from "@/lib/assignment-approval"
-import { assetsApi, assignmentsApi, maintenanceApi, type ApiAsset, type ApiAssignment, type ApiMaintenance } from "@/lib/api"
-import { clearTokens } from "@/lib/auth"
+import { assetsApi, assignmentsApi, maintenanceApi, authApi, type ApiAsset, type ApiAssignment, type ApiMaintenance } from "@/lib/api"
+import { clearTokens, getAccessToken } from "@/lib/auth"
 
 type AuthUser = {
   id: string
@@ -34,18 +34,18 @@ function toAsset(a: ApiAsset): Asset {
     id: a.id,
     name: a.name,
     category: a.category as Asset["category"],
-    serial: a.serial,
+    serial: "",
     status: a.status as Asset["status"],
     location: a.location ?? "",
     assignee: a.assignee_id,
-    purchaseDate: a.created_at.slice(0, 10),
-    price: 0,
+    purchaseDate: a.purchase_date?.slice(0, 10) ?? "",
+    price: parseFloat(a.purchase_price ?? "0") || 0,
     usefulLifeYears: 5,
-    warrantyMonths: 12,
-    repairCount: 0,
-    usageHoursPerWeek: 40,
-    sensorDeviceId: null,
-    lastUpdated: a.updated_at.slice(0, 10),
+    warrantyMonths: a.warranty_months ?? 12,
+    repairCount: a.repair_count ?? 0,
+    usageHoursPerWeek: parseFloat(a.usage_hours_per_week ?? "0") || 40,
+    sensorDeviceId: a.sensor_device_id ?? null,
+    lastUpdated: a.last_updated?.slice(0, 10) ?? "",
   }
 }
 
@@ -126,7 +126,7 @@ const StoreContext = createContext<StoreContextValue | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
-  const [isLoadingUser] = useState(false)
+  const [isLoadingUser, setIsLoadingUser] = useState(true)
   const [assets, setAssets] = useState<Asset[]>([])
   const [isLoadingAssets, setIsLoadingAssets] = useState(false)
   const [assignmentRecords, setAssignmentRecords] = useState<AssignmentRecord[]>([])
@@ -138,6 +138,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>(SEED_NOTIFICATIONS)
 
   const unreadCount = notifications.filter((n) => !n.isRead).length
+
+  // ─── Session rehydration on mount ──────────────────────────────────────────
+  // Restores the user from a previous session so a page refresh does not log
+  // the user out. Strategy (in priority order):
+  //   1. If an access_token exists in localStorage → validate via authApi.me()
+  //   2. Otherwise fall back to a locally-persisted "auth_user" (covers demo mode)
+
+  useEffect(() => {
+    const restore = async () => {
+      const token = getAccessToken()
+      if (token) {
+        try {
+          const profile = await authApi.me()
+          const authUser: AuthUser = {
+            id: profile.id,
+            name: profile.full_name,
+            email: profile.email,
+            role: profile.role as UserRole,
+            department: profile.department ?? "",
+          }
+          setUser(authUser)
+          localStorage.setItem("auth_user", JSON.stringify(authUser))
+        } catch {
+          // Token expired or backend down — try local fallback
+          const stored = localStorage.getItem("auth_user")
+          if (stored) {
+            try { setUser(JSON.parse(stored) as AuthUser) } catch { /* corrupt */ }
+          }
+        }
+      } else {
+        const stored = localStorage.getItem("auth_user")
+        if (stored) {
+          try { setUser(JSON.parse(stored) as AuthUser) } catch { /* corrupt */ }
+        }
+      }
+      setIsLoadingUser(false)
+    }
+    void restore()
+  }, [])
 
   // ─── Data fetching ──────────────────────────────────────────────────────────
 
@@ -212,24 +251,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       Auditor: { id: "demo-auditor", name: "Linda Torres", email: "linda.torres@company.com", role: "Auditor", department: "Compliance" },
     }
     const base = DEMO_USERS[role]
-    setUser({ ...base, email: email || base.email })
+    const authUser = { ...base, email: email || base.email }
+    setUser(authUser)
+    localStorage.setItem("auth_user", JSON.stringify(authUser))
   }, [])
 
   const loginWithProfile = useCallback(
     (profile: { id: string; email: string; full_name: string; role: string; department: string | null }) => {
-      setUser({
+      const authUser: AuthUser = {
         id: profile.id,
         name: profile.full_name,
         email: profile.email,
         role: profile.role as UserRole,
         department: profile.department ?? "",
-      })
+      }
+      setUser(authUser)
+      localStorage.setItem("auth_user", JSON.stringify(authUser))
     },
     [],
   )
 
   const logout = useCallback(() => {
     clearTokens()
+    localStorage.removeItem("auth_user")
     setUser(null)
   }, [])
 

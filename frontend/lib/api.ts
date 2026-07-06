@@ -78,13 +78,17 @@ export interface ApiAsset {
   id: string
   name: string
   category: string
-  serial: string
   status: string
   location: string | null
-  notes: string | null
   assignee_id: string | null
-  created_at: string
-  updated_at: string
+  purchase_date: string
+  purchase_price: string | null
+  warranty_months: number
+  repair_count: number
+  usage_hours_per_week: string
+  sensor_device_id: string | null
+  notes: string | null
+  last_updated: string
 }
 
 export interface ApiAssignment {
