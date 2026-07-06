@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     # Override to 'localhost' when running uvicorn directly outside Docker Compose.
     MQTT_BROKER_HOST: str = "mosquitto"
     MQTT_BROKER_PORT: int = 1883
+
+    # OpenAI / Anomaly Detection
+    # Absence of OPENAI_API_KEY must NOT crash the server — only a WARNING is logged.
+    OPENAI_API_KEY: Optional[str] = None
+    AI_ANOMALY_MODEL: str = "gpt-4o-mini"
+    AI_ANOMALY_INTERVAL_MINUTES: int = 60
+    # Number of most-recent readings per sensor to include in each AI analysis window
+    AI_ANOMALY_READINGS_WINDOW: int = 20
 
     @property
     def cors_origins_list(self) -> List[str]:
