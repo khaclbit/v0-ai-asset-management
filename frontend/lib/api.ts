@@ -309,3 +309,129 @@ export const notificationsApi = {
     return token ? `${BASE_URL}/notifications/stream?token=${token}` : ""
   },
 }
+
+// ─── Alert Rules types ────────────────────────────────────────────────────────
+
+export interface ApiAlertRuleCondition {
+  id: string
+  rule_id: string
+  category: string   // "value" | "temporal" | "composite"
+  type: string       // "threshold" | "range" | "enum_match" | "rate_of_change" | "flatline" | "window_aggregate"
+  parameters: Record<string, unknown>
+  logic_op: string | null   // "AND" | "OR" | null (for composite)
+  parent_id: string | null
+  sort_order: number
+  children: ApiAlertRuleCondition[]
+}
+
+export interface ApiAlertRuleChannel {
+  id: string
+  rule_id: string
+  channel: string    // "in_app" | "email" | "webhook"
+  config: Record<string, unknown>
+  is_enabled: boolean
+}
+
+export interface ApiAlertRule {
+  id: string
+  name: string
+  description: string | null
+  sensor_device_id: string
+  asset_id: string | null
+  is_enabled: boolean
+  severity: string   // "info" | "warning" | "critical"
+  cooldown_minutes: number
+  escalation_minutes: number | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  conditions: ApiAlertRuleCondition[]
+  channels: ApiAlertRuleChannel[]
+}
+
+export interface ApiAlertEvent {
+  id: string
+  rule_id: string
+  asset_id: string
+  sensor_device_id: string
+  triggered_at: string
+  reading_snapshot: Record<string, unknown>
+  severity: string
+  acknowledged: boolean
+  acknowledged_by: string | null
+  acknowledged_at: string | null
+}
+
+export interface ApiAlertRuleCreateRequest {
+  name: string
+  description?: string | null
+  sensor_device_id: string
+  asset_id?: string | null
+  is_enabled?: boolean
+  severity?: string
+  cooldown_minutes?: number
+  escalation_minutes?: number | null
+  conditions: {
+    category: string
+    type: string
+    parameters: Record<string, unknown>
+    logic_op?: string | null
+    parent_id?: string | null
+    sort_order?: number
+  }[]
+  channels: {
+    channel: string
+    config: Record<string, unknown>
+    is_enabled?: boolean
+  }[]
+}
+
+export interface ApiAlertRuleTestResult {
+  rule_id: string
+  rule_name: string
+  matched: boolean
+  reason: string
+  reading: {
+    id: string
+    device_id: string
+    metric: string
+    value: number
+    unit: string
+    recorded_at: string
+  } | null
+}
+
+export const alertRulesApi = {
+  list: (page = 1, size = 100): Promise<{ items: ApiAlertRule[]; total: number; page: number; size: number }> =>
+    apiFetch(`/alert-rules?page=${page}&size=${size}`),
+
+  get: (id: string): Promise<ApiAlertRule> =>
+    apiFetch(`/alert-rules/${id}`),
+
+  create: (data: ApiAlertRuleCreateRequest): Promise<ApiAlertRule> =>
+    apiFetch("/alert-rules", { method: "POST", body: JSON.stringify(data) }),
+
+  update: (id: string, data: Partial<{
+    name: string
+    description: string | null
+    sensor_device_id: string
+    asset_id: string | null
+    is_enabled: boolean
+    severity: string
+    cooldown_minutes: number
+    escalation_minutes: number | null
+  }>): Promise<ApiAlertRule> =>
+    apiFetch(`/alert-rules/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  delete: (id: string): Promise<void> =>
+    apiFetch(`/alert-rules/${id}`, { method: "DELETE" }),
+
+  test: (id: string): Promise<ApiAlertRuleTestResult> =>
+    apiFetch(`/alert-rules/${id}/test`, { method: "POST" }),
+
+  listEvents: (page = 1, size = 50): Promise<{ items: ApiAlertEvent[]; total: number; page: number; size: number }> =>
+    apiFetch(`/alert-events?page=${page}&size=${size}`),
+
+  acknowledgeEvent: (id: string): Promise<ApiAlertEvent> =>
+    apiFetch(`/alert-events/${id}/acknowledge`, { method: "PATCH" }),
+}
