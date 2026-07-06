@@ -6,6 +6,7 @@ from app.models.maintenance import MaintenanceRecord, MaintenanceStatus, MAINTEN
 from app.models.sensor_reading import SensorReading
 from app.models.ai_recommendation import AiRecommendation
 from app.models.notification import Notification
+from app.models.alert_rule import AlertRule, AlertRuleCondition, AlertEvent, AlertRuleChannel
 
 __all__ = [
     "Base",
@@ -23,4 +24,8 @@ __all__ = [
     "SensorReading",
     "AiRecommendation",
     "Notification",
+    "AlertRule",
+    "AlertRuleCondition",
+    "AlertEvent",
+    "AlertRuleChannel",
 ]
