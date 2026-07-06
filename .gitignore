@@ -25,3 +25,6 @@ pnpm-debug.log*
 .DS_Store
 backend/model/*.pkl
 .planning/
+
+# Graphify build cache
+graphify-out/
