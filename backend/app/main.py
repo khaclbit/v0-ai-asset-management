@@ -10,6 +10,7 @@ from app.config import settings
 from app.mqtt import start_mqtt_consumer
 from app.routers import auth, assets, users, assignments, maintenance, iot, ai, notifications
 from app.routers import alert_rules, alert_events
+from app.routers import anomaly_detections
 from app.services.anomaly_detector import run_anomaly_job
 from app.services.websocket_manager import connection_manager
 from app.services.notification_manager import notification_manager
@@ -87,6 +88,8 @@ app.include_router(ai.router, prefix=API_PREFIX)
 app.include_router(notifications.router, prefix=API_PREFIX)
 app.include_router(alert_rules.router, prefix=API_PREFIX)
 app.include_router(alert_events.router, prefix=API_PREFIX)
+app.include_router(anomaly_detections.router, prefix=API_PREFIX)
+app.include_router(anomaly_detections.system_settings_router, prefix=API_PREFIX)
 
 
 @app.get("/api/v1/health", tags=["Health"])
