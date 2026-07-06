@@ -4,6 +4,8 @@
  * Attaches Bearer token from localStorage and handles 401 → redirect to login.
  */
 
+import { clearTokens } from "@/lib/auth"
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"
 
 export class ApiError extends Error {
@@ -35,8 +37,7 @@ export async function apiFetch<T = unknown>(
 
   if (res.status === 401 && !skipAuth) {
     if (typeof window !== "undefined") {
-      localStorage.removeItem("access_token")
-      localStorage.removeItem("refresh_token")
+      clearTokens()
       window.location.href = "/"
     }
     throw new ApiError(401, "Session expired")

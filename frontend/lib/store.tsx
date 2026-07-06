@@ -273,7 +273,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearTokens()
-    localStorage.removeItem("auth_user")
     setUser(null)
   }, [])
 
