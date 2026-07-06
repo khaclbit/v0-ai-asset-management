@@ -7,6 +7,7 @@ from app.models.sensor_reading import SensorReading
 from app.models.ai_recommendation import AiRecommendation
 from app.models.notification import Notification
 from app.models.alert_rule import AlertRule, AlertRuleCondition, AlertEvent, AlertRuleChannel
+from app.models.anomaly_detection import AnomalyDetection, SystemSetting
 
 __all__ = [
     "Base",
@@ -28,4 +29,6 @@ __all__ = [
     "AlertRuleCondition",
     "AlertEvent",
     "AlertRuleChannel",
+    "AnomalyDetection",
+    "SystemSetting",
 ]
