@@ -19,6 +19,16 @@ class AlertRuleConditionCreate(BaseModel):
     sort_order: int = 0
 
 
+class AlertRuleConditionInput(BaseModel):
+    """Condition input without rule_id — used in nested AlertRuleCreateRequest body."""
+    category: str
+    type: str
+    parameters: Dict[str, Any] = {}
+    logic_op: Optional[str] = None
+    parent_id: Optional[uuid.UUID] = None
+    sort_order: int = 0
+
+
 class AlertRuleConditionRead(AlertRuleConditionCreate):
     id: uuid.UUID
     children: List["AlertRuleConditionRead"] = []
@@ -37,6 +47,19 @@ class AlertRuleCreate(BaseModel):
     severity: str = "info"
     cooldown_minutes: int = 5
     escalation_minutes: Optional[int] = None
+
+
+class AlertRuleChannelInput(BaseModel):
+    """Channel input without rule_id — used in nested AlertRuleCreateRequest body."""
+    channel: str
+    config: Dict[str, Any] = {}
+    is_enabled: bool = True
+
+
+class AlertRuleCreateRequest(AlertRuleCreate):
+    """Full alert rule creation body with nested conditions and channels."""
+    conditions: List[AlertRuleConditionInput] = []
+    channels: List[AlertRuleChannelInput] = []
 
 
 class AlertRuleRead(AlertRuleCreate):
@@ -61,6 +84,13 @@ class AlertRuleUpdate(BaseModel):
     escalation_minutes: Optional[int] = None
 
 
+class PaginatedAlertRules(BaseModel):
+    items: List[AlertRuleRead]
+    total: int
+    page: int
+    size: int
+
+
 # ── AlertEvent schemas ────────────────────────────────────────────────────────
 
 class AlertEventRead(BaseModel):
@@ -80,6 +110,13 @@ class AlertEventRead(BaseModel):
 
 class AlertEventAcknowledge(BaseModel):
     acknowledged_by: uuid.UUID
+
+
+class PaginatedAlertEvents(BaseModel):
+    items: List[AlertEventRead]
+    total: int
+    page: int
+    size: int
 
 
 # ── AlertRuleChannel schemas ──────────────────────────────────────────────────
