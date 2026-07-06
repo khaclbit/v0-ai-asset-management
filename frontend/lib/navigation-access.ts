@@ -18,6 +18,7 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
   { href: "/dashboard/reports",       label: "Reports",         roles: ["Admin", "Asset Manager"] },
   { href: "/dashboard/audit",         label: "Audit Log",       roles: ["Admin"] },
   { href: "/dashboard/users",         label: "Users",           roles: ["Admin"] },
+  { href: "/dashboard/settings",      label: "Settings",        roles: ["Admin"] },
 ]
 
 function normalizePathname(pathname: string) {

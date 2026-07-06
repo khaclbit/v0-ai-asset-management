@@ -20,6 +20,7 @@ import {
   Bell,
   BellRing,
   Users,
+  Settings,
 } from "lucide-react"
 
 const NAV_ICONS: Record<string, React.ElementType> = {
@@ -34,6 +35,7 @@ const NAV_ICONS: Record<string, React.ElementType> = {
   "/dashboard/reports": BarChart3,
   "/dashboard/audit": ScrollText,
   "/dashboard/users": Users,
+  "/dashboard/settings": Settings,
 }
 
 export function Sidebar() {
