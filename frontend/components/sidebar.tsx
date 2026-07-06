@@ -18,6 +18,7 @@ import {
   LogOut,
   MonitorSmartphone,
   Bell,
+  BellRing,
   Users,
 } from "lucide-react"
 
@@ -28,6 +29,7 @@ const NAV_ICONS: Record<string, React.ElementType> = {
   "/dashboard/maintenance": Wrench,
   "/dashboard/iot": MonitorSmartphone,
   "/dashboard/ai": TrendingUp,
+  "/dashboard/alert-rules": BellRing,
   "/dashboard/notifications": Bell,
   "/dashboard/reports": BarChart3,
   "/dashboard/audit": ScrollText,

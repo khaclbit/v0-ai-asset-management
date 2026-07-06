@@ -13,6 +13,7 @@ export const DASHBOARD_NAV: DashboardNavItem[] = [
   { href: "/dashboard/maintenance",   label: "Maintenance",     roles: ["Admin", "Asset Manager"] },
   { href: "/dashboard/iot",           label: "IoT Monitor",     roles: ["Admin", "Asset Manager"] },
   { href: "/dashboard/ai",            label: "AI Predictive",   roles: ["Admin", "Asset Manager"] },
+  { href: "/dashboard/alert-rules",   label: "Alert Rules",     roles: ["Admin", "Asset Manager", "Staff"] },
   { href: "/dashboard/notifications", label: "Notifications",   roles: ["Admin", "Asset Manager", "Staff"] },
   { href: "/dashboard/reports",       label: "Reports",         roles: ["Admin", "Asset Manager"] },
   { href: "/dashboard/audit",         label: "Audit Log",       roles: ["Admin"] },
