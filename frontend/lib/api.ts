@@ -441,7 +441,7 @@ export const anomalyApi = {
     ),
   summary: () => apiFetch<ApiAnomalySummaryItem[]>("/anomaly-detections/summary"),
   get: (id: string) => apiFetch<ApiAnomalyDetection>(`/anomaly-detections/${id}`),
-  runNow: () => apiFetch<{ status: string }>("/anomaly-detections/run-now", { method: "POST" }),
+  runNow: () => apiFetch<ApiAnomalyDetection[]>("/anomaly-detections/run-now", { method: "POST" }),
   getSettings: () => apiFetch<ApiSystemSetting[]>("/system-settings/anomaly"),
   updateSetting: (key: string, value: string) =>
     apiFetch<ApiSystemSetting>("/system-settings/anomaly", {

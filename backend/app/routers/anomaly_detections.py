@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,6 @@ from app.schemas.anomaly_detection import (
     AnomalyDetectionListResponse,
     AnomalyDetectionRead,
     AnomalyDetectionSummaryItem,
-    RunNowResponse,
     SystemSettingRead,
     SystemSettingUpdate,
 )
@@ -124,20 +123,18 @@ def get_anomaly_summary(
     return result
 
 
-@router.post("/run-now", response_model=RunNowResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/run-now", response_model=list[AnomalyDetectionRead])
 def run_anomaly_detection_now(
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
     _: User = Depends(require_role("Admin")),
 ):
     """
-    ADT-API-04 — Trigger an immediate anomaly detection run in a background thread.
+    ADT-API-04 — Trigger an immediate anomaly detection run and return the new batch.
     Admin only.
     """
     from app.services.anomaly_detector import run_anomaly_job  # lazy import avoids circular
 
-    background_tasks.add_task(run_anomaly_job)
-    return RunNowResponse(status="triggered")
+    detections = run_anomaly_job()
+    return detections
 
 
 @router.get("/{id}", response_model=AnomalyDetectionRead)

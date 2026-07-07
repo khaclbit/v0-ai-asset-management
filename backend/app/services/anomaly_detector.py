@@ -19,9 +19,12 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.models.anomaly_detection import AnomalyDetection
+from app.models.asset import Asset
 from app.models.notification import Notification
 from app.models.sensor_reading import SensorReading
 from app.models.user import User
+from app.schemas.anomaly_detection import AnomalyDetectionRead
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
@@ -48,28 +51,79 @@ def get_db_session():
 # Prompt builder
 # ---------------------------------------------------------------------------
 
-def build_prompt(readings: list[dict], asset_name: str) -> list[dict]:
-    """Build the OpenAI messages list for anomaly detection.
-
-    Returns a two-element list: system message + user message.
+def preprocess_readings(readings: list[dict]) -> list[dict]:
     """
+    Pivots raw metric logs into timestamped snapshots.
+    In a production environment with millions of rows, use Polars for this pivot.
+    """
+    snapshots = defaultdict(dict)
+    
+    for r in readings:
+        timestamp = r['recorded_at']
+        metric = r['metric']
+        # Combine value and unit for concise context
+        snapshots[timestamp][metric] = f"{r['value']}{r['unit']}"
+        
+    # Sort chronologically
+    sorted_timestamps = sorted(snapshots.keys())
+    
+    formatted_data = []
+    for ts in sorted_timestamps:
+        entry = {"time": ts}
+        entry.update(snapshots[ts])
+        formatted_data.append(entry)
+        
+    return formatted_data
+
+def build_prompt(readings: list[dict], asset_name: str, baseline_context: str = "") -> list[dict]:
+    """
+    Build the OpenAI messages list for anomaly detection using structured reasoning.
+    """
+    # 1. Preprocess the raw data into a readable time-series format
+    pivoted_data = preprocess_readings(readings)
+    
+    # Optional: Provide the LLM with baseline context if available in your system
+    if not baseline_context:
+        baseline_context = (
+            "No specific baseline provided. Use general engineering heuristics "
+            "for this asset type to determine expected operating ranges."
+        )
+
     system_message = {
         "role": "system",
         "content": (
-            "You are an IoT sensor anomaly detection system. "
-            "Analyze the provided sensor readings and detect anomalies. "
+            "You are an expert Reliability Engineer and IoT Data Analyst. "
+            "Your task is to think deeply step by step to analyze time-series sensor data for hardware assets and detect operational anomalies.\n\n"
+            "Anomalies may include:\n"
+            "- Sudden spikes or drops in values (e.g., rapid temperature scaling).\n"
+            "- Decoupled metrics (e.g., power consumption drops but temperature continues to rise).\n"
+            "- Unrealistic variations given the time intervals (e.g., massive shifts within 5 seconds).\n\n"
+            f"Asset Context: {baseline_context}\n\n"
+            "OUTPUT FORMAT INSTRUCTIONS:\n"
+            "You must output strictly valid JSON. To ensure accurate Chain of Thought reasoning, "
+            "You MUST return your JSON keys exactly as follow instruction:\n"
+            "1. \"explanation\": Think step-by-step. Analyze the trends, calculate the deltas between timestamps mentally, and state your findings.\n"
+            "2. \"confidence\": A float between 0.0 and 1.0 representing your certainty.\n"
+            "3. \"is_anomaly\": A boolean (true/false) representing your final conclusion based on the explanation."
             'Respond ONLY with valid JSON in exactly this format: '
             '{"is_anomaly": bool, "confidence": float 0-1, "explanation": string}'
         ),
     }
+    
     user_message = {
         "role": "user",
         "content": (
-            f"Asset: {asset_name}\n"
-            f"Sensor readings (most recent last):\n{json.dumps(readings, default=str, indent=2)}"
+            f"Asset Name: {asset_name}\n"
+            f"Chronological Sensor Snapshots:\n{json.dumps(pivoted_data, indent=2)}"
         ),
     }
+    
     return [system_message, user_message]
+
+# --- Example Usage based on your provided data ---
+# raw_readings = [...] # Your list of 20 dicts
+# messages = build_prompt(raw_readings, "Dell UltraSharp 27\"", "Typical power draw is ~30-45W. Max operating temp is 40°C.")
+# print(messages)
 
 
 # ---------------------------------------------------------------------------
@@ -179,8 +233,8 @@ def run_anomaly_detection_for_asset(
         response = client.chat.completions.create(
             model=settings.AI_ANOMALY_MODEL,
             messages=messages,
-            temperature=0.0,
-            max_tokens=256,
+            # temperature=0.0,
+            max_tokens=2048,
         )
         raw_content: str = response.choices[0].message.content or ""
         raw_response_data: dict = response.model_dump() if hasattr(response, "model_dump") else {}
@@ -267,61 +321,56 @@ def _create_anomaly_notifications(
 # Scheduler entry point
 # ---------------------------------------------------------------------------
 
-def run_anomaly_job() -> None:
+def run_anomaly_job() -> list[AnomalyDetectionRead]:
     """Scheduler entry point.
 
-    Queries all distinct sensor_device_ids active in the last 24 hours,
-    then runs anomaly detection for each. A single device failure does not
-    abort the rest.
+    Queries all assets that have a linked sensor device, then runs anomaly
+    detection for each and returns the detections created in this run. A
+    single device failure does not abort the rest.
     """
     if not settings.OPENAI_API_KEY:
         logger.warning(
             "run_anomaly_job: OPENAI_API_KEY is not set — skipping anomaly detection cycle."
         )
-        return
+        return []
 
-    since = datetime.now(tz=timezone.utc) - timedelta(hours=24)
+    detections: list[AnomalyDetectionRead] = []
 
     with get_db_session() as db:
-        # Fetch distinct (asset_id, device_id) pairs active in the last 24 h.
-        # SensorReading.asset_id is a String column (nullable) that mirrors the
-        # asset's sensor_device_id field — used here to resolve the FK for storage.
+        # Fetch every asset/device pair so clicking "run now" checks all devices.
         rows = db.execute(
-            select(SensorReading.device_id, SensorReading.asset_id)
-            .where(SensorReading.recorded_at >= since)
-            .distinct()
+            select(Asset.id, Asset.sensor_device_id)
+            .where(Asset.sensor_device_id.is_not(None))
+            .order_by(Asset.name.asc())
         ).all()
 
     if not rows:
-        logger.info("run_anomaly_job: no sensor activity in the last 24 h — nothing to analyse.")
+        logger.info("run_anomaly_job: no assets with linked sensor devices — nothing to analyse.")
         return
 
-    logger.info("run_anomaly_job: analysing %d distinct device/asset pairs.", len(rows))
+    logger.info("run_anomaly_job: analysing %d assets with linked sensor devices.", len(rows))
 
-    for device_id, asset_id_str in rows:
-        # Resolve asset_id to a UUID; skip rows where the asset link is not set
-        if not asset_id_str:
-            logger.debug("Skipping device %s — no asset_id resolved from sensor readings.", device_id)
-            continue
-
-        try:
-            asset_uuid = uuid.UUID(asset_id_str)
-        except (ValueError, AttributeError):
-            logger.warning("Skipping device %s — invalid asset_id value %r.", device_id, asset_id_str)
+    for asset_id, sensor_device_id in rows:
+        if not sensor_device_id:
+            logger.debug("Skipping asset %s — no sensor_device_id configured.", asset_id)
             continue
 
         try:
             with get_db_session() as db:
-                run_anomaly_detection_for_asset(
-                    asset_id=asset_uuid,
-                    sensor_device_id=device_id,
+                detection = run_anomaly_detection_for_asset(
+                    asset_id=asset_id,
+                    sensor_device_id=sensor_device_id,
                     db=db,
                 )
+                if detection is not None:
+                    detections.append(AnomalyDetectionRead.model_validate(detection))
         except Exception as exc:
             # One device failure must not abort the rest of the batch
             logger.error(
                 "run_anomaly_job: unhandled error for device %s: %s",
-                device_id,
+                sensor_device_id,
                 exc,
                 exc_info=True,
             )
+
+    return detections

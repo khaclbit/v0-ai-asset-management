@@ -81,6 +81,15 @@ export default function AiPredictivePage() {
     [assets]
   )
 
+  function loadAnomalies() {
+    setAnomaliesLoading(true)
+    anomalyApi
+      .list({ is_anomaly: true, size: 50 })
+      .then((data) => setAnomalies(data.items))
+      .catch(() => setAnomalies([]))
+      .finally(() => setAnomaliesLoading(false))
+  }
+
   // Load recommendations from real API on mount
   useEffect(() => {
     setIsLoading(true)
@@ -97,18 +106,17 @@ export default function AiPredictivePage() {
 
   // Load anomalies on mount
   useEffect(() => {
-    setAnomaliesLoading(true)
-    anomalyApi
-      .list({ is_anomaly: true, size: 50 })
-      .then((data) => setAnomalies(data.items))
-      .catch(() => setAnomalies([]))
-      .finally(() => setAnomaliesLoading(false))
+    loadAnomalies()
   }, [])
 
   async function handleRunNow() {
     setRunningNow(true)
     try {
-      await anomalyApi.runNow()
+      const freshItems = await anomalyApi.runNow()
+      setExpandedAnomalyId(null)
+      setAnomalies(
+        [...freshItems].sort((a, b) => b.created_at.localeCompare(a.created_at))
+      )
       toast.success("Anomaly detection triggered successfully")
     } catch {
       toast.error("Failed to trigger anomaly detection")
