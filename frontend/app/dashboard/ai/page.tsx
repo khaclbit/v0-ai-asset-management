@@ -436,7 +436,7 @@ export default function AiPredictivePage() {
                         <TableRow>
                           <TableHead>Asset</TableHead>
                           <TableHead>Time Window</TableHead>
-                          <TableHead className="text-right">Confidence</TableHead>
+                          <TableHead className="text-right">Anomaly Confidence</TableHead>
                           <TableHead>Model</TableHead>
                           <TableHead>Explanation</TableHead>
                         </TableRow>
@@ -492,7 +492,8 @@ export default function AiPredictivePage() {
                                       <Separator />
                                       <div className="grid gap-2 sm:grid-cols-3">
                                         <div>
-                                          <p className="text-xs text-muted-foreground">Confidence</p>
+                                          <p className="text-xs text-muted-foreground">Anomaly Confidence</p>
+                                          <p className="text-xs text-muted-foreground/70">(likelihood device is abnormal)</p>
                                           <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
                                             <div
                                               className="h-full rounded-full bg-primary"

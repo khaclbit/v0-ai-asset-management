@@ -103,7 +103,7 @@ def build_prompt(readings: list[dict], asset_name: str, baseline_context: str = 
             "You must output strictly valid JSON. To ensure accurate Chain of Thought reasoning, "
             "You MUST return your JSON keys exactly as follow instruction:\n"
             "1. \"explanation\": Think step-by-step. Analyze the trends, calculate the deltas between timestamps mentally, and state your findings.\n"
-            "2. \"confidence\": A float between 0.0 and 1.0 representing your certainty.\n"
+            "2. \"confidence\": A float between 0.0 and 1.0 representing the probability that the device IS experiencing an anomaly (i.e. abnormality likelihood, not certainty about your conclusion).\n"
             "3. \"is_anomaly\": A boolean (true/false) representing your final conclusion based on the explanation."
             'Respond ONLY with valid JSON in exactly this format: '
             '{"is_anomaly": bool, "confidence": float 0-1, "explanation": string}'
