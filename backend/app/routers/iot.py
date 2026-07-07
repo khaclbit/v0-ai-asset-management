@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
@@ -39,17 +40,25 @@ async def websocket_endpoint(websocket: WebSocket, device_id: str):
 def get_readings(
     device_id: str,
     metric: Optional[str] = Query(default=None, description="Filter by metric name"),
-    limit: int = Query(default=100, ge=1, le=1000),
+    limit: int = Query(default=200, ge=1, le=2000),
+    hours: Optional[int] = Query(
+        default=None, ge=1, le=168,
+        description="Return readings from the last N hours (1–168). "
+                    "When set, limit is applied within the time window.",
+    ),
     db: Session = Depends(get_db),
 ):
     """
     IOT-WS-03: Return last N readings for a device (cold-start backfill).
-    Optionally filter by metric. Default limit=100, max=1000.
+    Optionally filter by metric and/or time window.
     Returns in ascending order (oldest first) for chart rendering.
     """
     query = db.query(SensorReading).filter(SensorReading.device_id == device_id)
     if metric:
         query = query.filter(SensorReading.metric == metric)
+    if hours is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        query = query.filter(SensorReading.recorded_at >= cutoff)
 
     readings = (
         query.order_by(SensorReading.recorded_at.desc()).limit(limit).all()

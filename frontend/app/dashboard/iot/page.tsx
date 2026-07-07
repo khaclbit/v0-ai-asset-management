@@ -18,6 +18,7 @@ import { type AssetCategory } from "@/lib/data"
 import { anomalyApi } from "@/lib/api"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine } from "recharts"
 import { cn } from "@/lib/utils"
+import { Loader2 } from "lucide-react"
 import { useIotWebSocket } from "@/hooks/useIotWebSocket"
 
 // ── Sensor configuration ──────────────────────────────────────────────────────
@@ -25,37 +26,31 @@ import { useIotWebSocket } from "@/hooks/useIotWebSocket"
 type SensorKey = "temperature" | "humidity" | "power" | "current" | "vibration" | "running_hours"
 
 const SENSOR_CONFIG: Record<SensorKey, {
-  label: string; unit: string; color: string; warning: number; critical: number; baseValues: Record<AssetCategory, number>
+  label: string; unit: string; color: string; warning: number; critical: number
 }> = {
   temperature: {
     label: "Temperature", unit: "°C", color: "var(--chart-1)",
     warning: 60, critical: 75,
-    baseValues: { Laptop: 45, Monitor: 38, Printer: 50, Forklift: 68, "Office Equipment": 35 },
   },
   humidity: {
     label: "Humidity", unit: "%", color: "var(--chart-2)",
     warning: 70, critical: 85,
-    baseValues: { Laptop: 58, Monitor: 52, Printer: 65, Forklift: 50, "Office Equipment": 55 },
   },
   power: {
     label: "Power", unit: " W", color: "var(--chart-3)",
     warning: 800, critical: 1000,
-    baseValues: { Laptop: 65, Monitor: 40, Printer: 420, Forklift: 750, "Office Equipment": 30 },
   },
   current: {
     label: "Current", unit: " A", color: "var(--chart-4)",
     warning: 8, critical: 12,
-    baseValues: { Laptop: 1.2, Monitor: 0.8, Printer: 3.5, Forklift: 6.8, "Office Equipment": 0.5 },
   },
   vibration: {
     label: "Vibration", unit: " mm/s", color: "var(--chart-5)",
     warning: 2.5, critical: 5,
-    baseValues: { Laptop: 0.3, Monitor: 0.2, Printer: 1.2, Forklift: 3.1, "Office Equipment": 0.4 },
   },
   running_hours: {
     label: "Running Hours", unit: " h", color: "var(--chart-6)",
     warning: 2000, critical: 3000,
-    baseValues: { Laptop: 1850, Monitor: 1200, Printer: 2400, Forklift: 2800, "Office Equipment": 900 },
   },
 }
 
@@ -102,7 +97,8 @@ function getAssetSensorStatus(
   for (const key of sensors) {
     const cfg = SENSOR_CONFIG[key]
     const pts = readings[key]
-    const v = pts?.length ? pts[pts.length - 1].value : cfg.baseValues[category]
+    if (!pts?.length) continue  // no data — skip this metric
+    const v = pts[pts.length - 1].value
     if (v > cfg.critical) return "violation"
     if (v > cfg.warning) return "warning"
   }
@@ -137,15 +133,16 @@ export default function IoTMonitoringPage() {
 
   const sensorKeys = selectedAsset ? SENSOR_CATEGORY_MAP[selectedAsset.category] : []
 
-  const { readings: wsReadings, status: wsStatus } = useIotWebSocket(
+  const { readings: wsReadings, status: wsStatus, historyLoading } = useIotWebSocket(
     selectedAsset?.sensorDeviceId ?? null,
     sensorKeys,
+    windowHours,
   )
 
-  // Derive latest value per metric from live readings state (fallback to base value when no data)
-  const getLatestFromState = (key: SensorKey, fallback: number): number => {
+  // Derive latest value per metric from real DB+WS readings (null = no data yet)
+  const getLatest = (key: SensorKey): number | null => {
     const pts = wsReadings[key]
-    return pts?.length ? pts[pts.length - 1].value : fallback
+    return pts?.length ? pts[pts.length - 1].value : null
   }
 
   // Sidebar status uses live readings for selected asset; "online" for others (not yet monitored)
@@ -252,9 +249,8 @@ export default function IoTMonitoringPage() {
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                 {sensorKeys.map((key) => {
                   const cfg = SENSOR_CONFIG[key]
-                  const base = cfg.baseValues[selectedAsset.category]
-                  const latest = getLatestFromState(key, base)
-                  const state = getValueState(latest, cfg.warning, cfg.critical)
+                  const latest = getLatest(key)
+                  const state = latest !== null ? getValueState(latest, cfg.warning, cfg.critical) : "normal"
                   return (
                     <Card
                       key={key}
@@ -267,26 +263,37 @@ export default function IoTMonitoringPage() {
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {cfg.label}
                         </p>
-                        <p
-                          className={cn(
-                            "font-mono text-2xl font-bold",
-                            state === "violation" && "text-destructive",
-                            state === "near" && "text-chart-4",
-                            state === "normal" && "text-foreground",
-                          )}
-                        >
-                          {latest}{cfg.unit}
-                        </p>
-                        <p
-                          className={cn(
-                            "text-xs",
-                            state === "violation" && "text-destructive",
-                            state === "near" && "text-chart-4",
-                            state === "normal" && "text-muted-foreground",
-                          )}
-                        >
-                          {state === "violation" ? "⚠ Above limit" : state === "near" ? "Near limit" : "Normal"}
-                        </p>
+                        {historyLoading && latest === null ? (
+                          <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <Loader2 className="size-4 animate-spin" />
+                            <span className="text-sm">Loading…</span>
+                          </div>
+                        ) : latest !== null ? (
+                          <>
+                            <p
+                              className={cn(
+                                "font-mono text-2xl font-bold",
+                                state === "violation" && "text-destructive",
+                                state === "near" && "text-chart-4",
+                                state === "normal" && "text-foreground",
+                              )}
+                            >
+                              {latest % 1 === 0 ? latest : latest.toFixed(2)}{cfg.unit}
+                            </p>
+                            <p
+                              className={cn(
+                                "text-xs",
+                                state === "violation" && "text-destructive",
+                                state === "near" && "text-chart-4",
+                                state === "normal" && "text-muted-foreground",
+                              )}
+                            >
+                              {state === "violation" ? "⚠ Above limit" : state === "near" ? "Near limit" : "Normal"}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="font-mono text-2xl font-bold text-muted-foreground">—</p>
+                        )}
                       </CardContent>
                     </Card>
                   )
@@ -297,9 +304,8 @@ export default function IoTMonitoringPage() {
               <div className="space-y-6">
                 {sensorKeys.map((key) => {
                   const cfg = SENSOR_CONFIG[key]
-                  // Filter wsReadings to the selected time window for display
-                  const cutoff = Date.now() - windowHours * 3600_000
-                  const data = (wsReadings[key] ?? []).filter((p) => p.ts >= cutoff)
+                  // wsReadings is already scoped to windowHours by the hook
+                  const data = wsReadings[key] ?? []
                   const chartConfig = {
                     value: { label: `${cfg.label} (${cfg.unit.trim()})`, color: cfg.color },
                   }

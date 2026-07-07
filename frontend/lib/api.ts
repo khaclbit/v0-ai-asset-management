@@ -227,12 +227,14 @@ export interface SensorReadingOut {
 
 export const iotApi = {
   /**
-   * Fetch last N readings for a device (oldest-first, ready for chart rendering).
-   * Optionally filter by metric name.
+   * Fetch readings for a device (oldest-first, ready for chart rendering).
+   * Pass `hours` to restrict to the last N hours of DB history (1–168).
+   * Pass `limit` to cap the number of points returned (default 200, max 2000).
    */
-  getHistory: (deviceId: string, metric?: string, limit = 200): Promise<SensorReadingOut[]> => {
+  getHistory: (deviceId: string, metric?: string, limit = 200, hours?: number): Promise<SensorReadingOut[]> => {
     const params = new URLSearchParams({ limit: String(limit) })
     if (metric) params.set("metric", metric)
+    if (hours !== undefined) params.set("hours", String(hours))
     return apiFetch<SensorReadingOut[]>(`/iot/readings/${deviceId}?${params}`)
   },
 
