@@ -17,10 +17,12 @@ Environment variables:
 
 import asyncio
 import json
+import math
 import os
 import random
 import signal
 import time
+from datetime import datetime
 
 import aiomqtt
 
@@ -82,6 +84,18 @@ METRIC_UNITS: dict[str, str] = {
     "running_hours": "h",
 }
 
+# Physical bounds per metric (min, max)
+METRIC_BOUNDS: dict[str, tuple[float, float]] = {
+    "temperature":   (5.0,   120.0),
+    "humidity":      (15.0,   98.0),
+    "power":         (0.5,  3000.0),
+    "current":       (0.01,   30.0),
+    "vibration":     (0.0,    25.0),
+}
+
+# Per-device per-metric current simulation state
+_state: dict[str, dict[str, float]] = {}
+
 
 # ─── Device list resolution ──────────────────────────────────────────────────
 
@@ -95,9 +109,43 @@ def get_devices() -> list[dict]:
 
 # ─── Value generation ────────────────────────────────────────────────────────
 
-def _noisy(base: float) -> float:
-    """Apply ±8% uniform noise to a base value."""
-    return round(base * (1 + random.uniform(-0.08, 0.08)), 2)
+def _time_of_day_offset(metric: str, base: float) -> float:
+    """
+    Sinusoidal offset that peaks at 14:00 and troughs at 02:00.
+    Applied to thermal and electrical metrics to simulate load patterns.
+    Amplitude: ±4% of base.
+    """
+    if metric not in ("temperature", "power", "current"):
+        return 0.0
+    hour = datetime.now().hour + datetime.now().minute / 60.0
+    return base * 0.04 * math.sin(math.pi * (hour - 2.0) / 12.0)
+
+
+def _step(device_id: str, metric: str, base: float) -> float:
+    """
+    Advance one simulation tick using a mean-reverting random walk (Ornstein–Uhlenbeck-style).
+
+    - Target = base + time-of-day offset.
+    - Pulls current value 5 % of the way toward the target each tick (mean reversion).
+    - Adds Gaussian noise scaled to 1 % of base (min 0.05) per tick.
+    - Clamps result to METRIC_BOUNDS.
+
+    This produces smooth, physically plausible time series rather than
+    uncorrelated uniform noise.
+    """
+    state   = _state.setdefault(device_id, {})
+    target  = base + _time_of_day_offset(metric, base)
+    current = state.get(metric, target)  # start at target on first tick
+
+    pull    = 0.05 * (target - current)
+    sigma   = max(abs(base) * 0.01, 0.05)
+    noise   = random.gauss(0.0, sigma)
+
+    lo, hi  = METRIC_BOUNDS.get(metric, (0.0, 1e9))
+    new_val = max(lo, min(hi, current + pull + noise))
+
+    state[metric] = new_val
+    return round(new_val, 2)
 
 
 # ─── Main publish loop ───────────────────────────────────────────────────────
@@ -143,7 +191,7 @@ async def main() -> None:
                         value = round(running_hours_state[device_id], 4)
                     else:
                         base  = bases.get(metric, 0.0)
-                        value = _noisy(base)
+                        value = _step(device_id, metric, base)
 
                     payload = json.dumps({
                         "value": value,
