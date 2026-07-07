@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Topbar } from "@/components/topbar"
 import { StatusBadge } from "@/components/status-badge"
@@ -19,14 +19,9 @@ import {
 } from "@/components/ui/table"
 import { useStore } from "@/lib/store"
 import { formatDate, type Asset } from "@/lib/data"
-import { ArrowLeft, Pencil, Thermometer, Droplets, Zap } from "lucide-react"
+import { iotApi, type SensorReadingOut } from "@/lib/api"
+import { ArrowLeft, Loader2, Pencil } from "lucide-react"
 import { toast } from "sonner"
-
-const MOCK_SENSOR_READINGS = [
-  { label: "Temperature", value: "23.4 °C", icon: Thermometer },
-  { label: "Humidity", value: "61.2 %", icon: Droplets },
-  { label: "Power", value: "0.85 kW", icon: Zap },
-]
 
 export default function AssetDetailPage() {
   const params = useParams()
@@ -39,6 +34,31 @@ export default function AssetDetailPage() {
   const canEdit = user?.role === "Admin" || user?.role === "Asset Manager"
 
   const [formOpen, setFormOpen] = useState(false)
+
+  // Latest sensor reading per metric from the real backend
+  const [latestReadings, setLatestReadings] = useState<SensorReadingOut[]>([])
+  const [sensorLoading, setSensorLoading] = useState(false)
+
+  useEffect(() => {
+    const devId = asset?.sensorDeviceId
+    if (!devId) return
+    setSensorLoading(true)
+    iotApi
+      .getHistory(devId, undefined, 200)
+      .then((readings) => {
+        // Keep only the most recent reading per metric
+        const latestMap = new Map<string, SensorReadingOut>()
+        for (const r of readings) {
+          const existing = latestMap.get(r.metric)
+          if (!existing || r.recorded_at > existing.recorded_at) {
+            latestMap.set(r.metric, r)
+          }
+        }
+        setLatestReadings(Array.from(latestMap.values()))
+      })
+      .catch(() => setLatestReadings([]))
+      .finally(() => setSensorLoading(false))
+  }, [asset?.sensorDeviceId])
 
   const recentAssignments = useMemo(
     () =>
@@ -136,16 +156,27 @@ export default function AssetDetailPage() {
                     <span className="text-sm text-muted-foreground">Device ID:</span>
                     <SensorStatusDot sensorDeviceId={asset.sensorDeviceId} />
                   </div>
-                  <p className="text-xs text-muted-foreground">Static mock readings — live data available in IoT Monitoring.</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {MOCK_SENSOR_READINGS.map(({ label, value, icon: Icon }) => (
-                      <div key={label} className="rounded-lg border bg-muted/30 p-3 text-center">
-                        <Icon className="mx-auto mb-1 size-4 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground">{label}</p>
-                        <p className="mt-0.5 font-semibold text-sm">{value}</p>
-                      </div>
-                    ))}
-                  </div>
+                  {sensorLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" />
+                      Loading sensor data…
+                    </div>
+                  ) : latestReadings.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      {latestReadings.map((r) => (
+                        <div key={r.metric} className="rounded-lg border bg-muted/30 p-3 text-center">
+                          <p className="text-xs capitalize text-muted-foreground">
+                            {r.metric.replace(/_/g, " ")}
+                          </p>
+                          <p className="mt-0.5 text-sm font-semibold">
+                            {r.value % 1 === 0 ? r.value : r.value.toFixed(2)}{r.unit ? ` ${r.unit}` : ""}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No sensor readings yet. Start the IoT simulator to populate data.</p>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No IoT sensor linked to this asset.</p>

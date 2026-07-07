@@ -169,7 +169,13 @@ def run_inference(db: Session, asset_id: str, requesting_user: User) -> AiRecomm
     risk_level: str = str(model.predict(X)[0])
     probas = model.predict_proba(X)[0]
     classes = [str(c) for c in artifact["label_classes"]]
-    confidence = float(probas[classes.index(risk_level)])
+    # Confidence = probability the device is abnormal (Medium or High risk),
+    # NOT the model's confidence in its specific predicted class.
+    low_idx = next((i for i, c in enumerate(classes) if c == "Low"), None)
+    if low_idx is not None:
+        confidence = float(1.0 - probas[low_idx])
+    else:
+        confidence = float(sum(p for c, p in zip(classes, probas) if c != "Low"))
     risk_score = _derive_risk_score(features, risk_level)
     top_factors = _top_factors(features, risk_level)
     recommendation = _recommendation_text(risk_level, asset.name)

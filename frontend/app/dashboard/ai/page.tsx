@@ -90,13 +90,14 @@ export default function AiPredictivePage() {
       .finally(() => setAnomaliesLoading(false))
   }
 
-  // Load recommendations from real API on mount
+  // Load recommendations from real API on mount — only show alert devices (High/Medium risk)
   useEffect(() => {
     setIsLoading(true)
     aiApi
       .listRecommendations()
       .then((items) => {
-        setRecommendations(items.map((r) => toUiRec(r, assetMap[r.asset_id] ?? r.asset_id)))
+        const mapped = items.map((r) => toUiRec(r, assetMap[r.asset_id] ?? r.asset_id))
+        setRecommendations(mapped.filter((r) => r.risk.level !== "Low"))
       })
       .catch(() => {
         // API unavailable — keep empty state; no mock fallback
@@ -202,12 +203,12 @@ export default function AiPredictivePage() {
               Predictive Summary
             </CardTitle>
             <CardDescription>
-              Recommendations sorted by risk first, then confidence. High-risk items include SLA monitoring.
+              Showing alert devices only (High and Medium risk). Low-risk assets are excluded. High-risk items include SLA monitoring.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm sm:grid-cols-3">
             <div className="rounded-lg border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">Total recommendations</p>
+              <p className="text-xs text-muted-foreground">Alert devices</p>
               <p className="text-lg font-semibold">{recommendations.length}</p>
             </div>
             <div className="rounded-lg border bg-muted/30 p-3">
