@@ -25,6 +25,7 @@ import time
 from datetime import datetime
 
 import aiomqtt
+from seed import SEED_DEVICE_REGISTRY
 
 # ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -35,11 +36,12 @@ INTERVAL: int = 5  # seconds between publish cycles
 # ─── Device registry ─────────────────────────────────────────────────────────
 
 DEFAULT_DEVICES = [
-    {"device_id": "DEV-LAPTOP-01",   "category": "Laptop"},
-    {"device_id": "DEV-MONITOR-01",  "category": "Monitor"},
-    {"device_id": "DEV-PRINTER-01",  "category": "Printer"},
-    {"device_id": "DEV-FORKLIFT-01", "category": "Forklift"},
-    {"device_id": "DEV-OFFICE-01",   "category": "Office Equipment"},
+    {
+        "device_id": item["sensor_device_id"],
+        "category": item["category"],
+    }
+    for item in SEED_DEVICE_REGISTRY
+    if item.get("sensor_device_id")
 ]
 
 # ─── Sensor config (must mirror frontend SENSOR_CONFIG / SENSOR_CATEGORY_MAP) ─
@@ -52,27 +54,32 @@ SENSOR_CATEGORY_MAP: dict[str, list[str]] = {
     "Office Equipment": ["temperature", "humidity", "power", "running_hours"],
 }
 
-BASE_VALUES: dict[str, dict[str, float]] = {
-    "DEV-LAPTOP-01": {
+CATEGORY_BASE_VALUES: dict[str, dict[str, float]] = {
+    "Laptop": {
         "temperature": 45.0, "humidity": 58.0, "power": 65.0,
         "current": 1.2, "running_hours": 1850.0,
     },
-    "DEV-MONITOR-01": {
+    "Monitor": {
         "temperature": 38.0, "power": 40.0,
         "current": 0.8, "running_hours": 1200.0,
     },
-    "DEV-PRINTER-01": {
+    "Printer": {
         "temperature": 50.0, "humidity": 65.0, "power": 420.0,
         "current": 3.5, "vibration": 1.2, "running_hours": 2400.0,
     },
-    "DEV-FORKLIFT-01": {
+    "Forklift": {
         "temperature": 68.0, "power": 750.0,
         "current": 6.8, "vibration": 3.1, "running_hours": 2800.0,
     },
-    "DEV-OFFICE-01": {
+    "Office Equipment": {
         "temperature": 35.0, "humidity": 55.0,
         "power": 30.0, "running_hours": 900.0,
     },
+}
+
+BASE_VALUES: dict[str, dict[str, float]] = {
+    device["device_id"]: dict(CATEGORY_BASE_VALUES[device["category"]])
+    for device in DEFAULT_DEVICES
 }
 
 METRIC_UNITS: dict[str, str] = {

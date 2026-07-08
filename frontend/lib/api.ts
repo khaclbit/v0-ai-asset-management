@@ -277,6 +277,10 @@ export const aiApi = {
       method: "POST",
       body: JSON.stringify({ asset_id: assetId }),
     }),
+  runNow: (): Promise<ApiAiRecommendation[]> =>
+    apiFetch<ApiAiRecommendation[]>("/ai/recommendations/run-now", {
+      method: "POST",
+    }),
   approveRecommendation: (recId: string): Promise<ApiAiRecommendation> =>
     apiFetch<ApiAiRecommendation>(`/ai/recommendations/${recId}/approve`, { method: "POST" }),
   deferRecommendation: (recId: string, deferReason?: string): Promise<ApiAiRecommendation> =>

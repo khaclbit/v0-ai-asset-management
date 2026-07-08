@@ -15,7 +15,11 @@ Or via Docker Compose after migrations:
 import sys
 import os
 
+from pathlib import Path
+
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from datetime import date
 from decimal import Decimal
@@ -155,6 +159,8 @@ IOT_ASSETS = [
         "warranty_months": 24,
         "usage_hours_per_week": Decimal("10.0"),
     },
+    
+    
 ]
 
 EXTRA_DEVICE_REGISTRY = [
@@ -178,25 +184,162 @@ EXTRA_DEVICE_REGISTRY = [
     {"name": "Logitech MeetUp Conference Camera", "category": "Office Equipment", "sensor_device_id": "DEV-MEETUP-CAMERA"},
 ]
 
-SEED_DEVICE_REGISTRY = IOT_ASSETS + EXTRA_DEVICE_REGISTRY
+EXTRA_ASSETS = [
+    # ── Laptops ──────────────────────────────────────────────────────────
+    {
+        "name": "MacBook Pro 16-inch (2023)",
+        "category": "Laptop", "status": "available", "location": "Floor 2",
+        "sensor_device_id": "DEV-MACBOOK-PRO-16-2023",
+        "purchase_date": date(2023, 9, 1),  "purchase_price": Decimal("2499.00"),
+        "warranty_months": 12, "usage_hours_per_week": Decimal("40.0"),
+    },
+    {
+        "name": "Lenovo ThinkPad T14s",
+        "category": "Laptop", "status": "assigned", "location": "Floor 2",
+        "sensor_device_id": "DEV-THINKPAD-T14S",
+        "purchase_date": date(2022, 7, 12), "purchase_price": Decimal("1350.00"),
+        "warranty_months": 36, "usage_hours_per_week": Decimal("40.0"),
+    },
+    {
+        "name": "HP EliteBook 850 G8",
+        "category": "Laptop", "status": "maintenance", "location": "IT Storage",
+        "sensor_device_id": "DEV-ELITEBOOK-850-G8",
+        "purchase_date": date(2021, 4, 5),  "purchase_price": Decimal("1200.00"),
+        "warranty_months": 36, "repair_count": 2, "usage_hours_per_week": Decimal("40.0"),
+    },
+    {
+        "name": "Dell Latitude 5530",
+        "category": "Laptop", "status": "assigned", "location": "Floor 3",
+        "sensor_device_id": "DEV-LATITUDE-5530",
+        "purchase_date": date(2023, 1, 20), "purchase_price": Decimal("1150.00"),
+        "warranty_months": 36, "usage_hours_per_week": Decimal("35.0"),
+    },
+    # ── Monitors ─────────────────────────────────────────────────────────
+    {
+        "name": "Samsung Odyssey G7 32-inch",
+        "category": "Monitor", "status": "available", "location": "Floor 3",
+        "sensor_device_id": "DEV-ODYSSEY-G7-32",
+        "purchase_date": date(2023, 3, 8),  "purchase_price": Decimal("750.00"),
+        "warranty_months": 36, "usage_hours_per_week": Decimal("40.0"),
+    },
+    {
+        "name": "LG UltraWide 34WL500",
+        "category": "Monitor", "status": "assigned", "location": "Floor 1",
+        "sensor_device_id": "DEV-ULTRAWIDE-34WL500",
+        "purchase_date": date(2022, 11, 1), "purchase_price": Decimal("500.00"),
+        "warranty_months": 24, "usage_hours_per_week": Decimal("35.0"),
+    },
+    {
+        "name": "BenQ PD3220U 32-inch",
+        "category": "Monitor", "status": "available", "location": "Conference Room B",
+        "sensor_device_id": "DEV-PD3220U-32",
+        "purchase_date": date(2022, 6, 15), "purchase_price": Decimal("850.00"),
+        "warranty_months": 36, "usage_hours_per_week": Decimal("20.0"),
+    },
+    {
+        "name": "ASUS ProArt PA278QV",
+        "category": "Monitor", "status": "maintenance", "location": "IT Storage",
+        "sensor_device_id": "DEV-PA278QV",
+        "purchase_date": date(2020, 9, 10), "purchase_price": Decimal("420.00"),
+        "warranty_months": 36, "repair_count": 1, "usage_hours_per_week": Decimal("40.0"),
+    },
+    # ── Printers ─────────────────────────────────────────────────────────
+    {
+        "name": "Canon imageCLASS MF445dw",
+        "category": "Printer", "status": "available", "location": "Floor 3",
+        "sensor_device_id": "DEV-MF445DW",
+        "purchase_date": date(2023, 4, 12), "purchase_price": Decimal("380.00"),
+        "warranty_months": 12, "usage_hours_per_week": Decimal("15.0"),
+    },
+    {
+        "name": "Xerox VersaLink C405",
+        "category": "Printer", "status": "retired", "location": "Storage",
+        "sensor_device_id": "DEV-C405",
+        "purchase_date": date(2018, 2, 1),  "purchase_price": Decimal("650.00"),
+        "warranty_months": 12, "repair_count": 5, "usage_hours_per_week": Decimal("0.0"),
+    },
+    {
+        "name": "Brother MFC-L8900CDW",
+        "category": "Printer", "status": "maintenance", "location": "Floor 2",
+        "sensor_device_id": "DEV-MFC-L8900CDW",
+        "purchase_date": date(2021, 10, 5), "purchase_price": Decimal("520.00"),
+        "warranty_months": 24, "repair_count": 2, "usage_hours_per_week": Decimal("20.0"),
+    },
+    {
+        "name": "HP Color LaserJet E77830",
+        "category": "Printer", "status": "available", "location": "Floor 1",
+        "sensor_device_id": "DEV-E77830",
+        "purchase_date": date(2023, 6, 1),  "purchase_price": Decimal("2200.00"),
+        "warranty_months": 36, "usage_hours_per_week": Decimal("30.0"),
+    },
+    {
+        "name": "Epson WorkForce WF-7840",
+        "category": "Printer", "status": "assigned", "location": "HR Office",
+        "sensor_device_id": "DEV-WF-7840",
+        "purchase_date": date(2022, 3, 5),  "purchase_price": Decimal("350.00"),
+        "warranty_months": 12, "usage_hours_per_week": Decimal("20.0"),
+    },
+    # ── Forklifts ────────────────────────────────────────────────────────
+    {
+        "name": "Crown FC 4500 Series",
+        "category": "Forklift", "status": "available", "location": "Warehouse",
+        "sensor_device_id": "DEV-FC-4500",
+        "purchase_date": date(2021, 6, 1),  "purchase_price": Decimal("18500.00"),
+        "warranty_months": 24, "usage_hours_per_week": Decimal("45.0"),
+    },
+    {
+        "name": "Hyster E50XN Forklift",
+        "category": "Forklift", "status": "maintenance", "location": "Maintenance Bay",
+        "sensor_device_id": "DEV-E50XN",
+        "purchase_date": date(2019, 3, 15), "purchase_price": Decimal("19800.00"),
+        "warranty_months": 24, "repair_count": 3, "usage_hours_per_week": Decimal("50.0"),
+    },
+    # ── Office Equipment ─────────────────────────────────────────────────
+    {
+        "name": "Cisco IP Phone 8841",
+        "category": "Office Equipment", "status": "assigned", "location": "Floor 1",
+        "sensor_device_id": "DEV-IPPHONE-8841",
+        "purchase_date": date(2022, 1, 10), "purchase_price": Decimal("320.00"),
+        "warranty_months": 12, "usage_hours_per_week": Decimal("40.0"),
+    },
+    {
+        "name": "Polycom RealPresence Group 300",
+        "category": "Office Equipment", "status": "available", "location": "Conference Room A",
+        "sensor_device_id": "DEV-GROUP-300",
+        "purchase_date": date(2022, 8, 20), "purchase_price": Decimal("1800.00"),
+        "warranty_months": 24, "usage_hours_per_week": Decimal("10.0"),
+    },
+    {
+        "name": "Logitech MeetUp Conference Camera",
+        "category": "Office Equipment", "status": "available", "location": "Conference Room B",
+        "sensor_device_id": "DEV-MEETUP-CAMERA",
+        "purchase_date": date(2023, 5, 1),  "purchase_price": Decimal("849.00"),
+        "warranty_months": 24, "usage_hours_per_week": Decimal("8.0"),
+    },  
+]
+SEED_DEVICE_REGISTRY = IOT_ASSETS + EXTRA_ASSETS
+SEED_DEVICE_BY_NAME = {item["name"]: item for item in SEED_DEVICE_REGISTRY}
 
 
 def seed_iot_assets(db: Session) -> dict[str, Asset]:
     """Seed IoT-enabled assets. Returns sensor_device_id→Asset map."""
     created = 0
     asset_map: dict[str, Asset] = {}
-    for item in IOT_ASSETS:
+    for item in SEED_DEVICE_REGISTRY:
+        sensor_device_id = item.get("sensor_device_id")
+        if not sensor_device_id:
+            continue
         existing = db.query(Asset).filter(
-            Asset.sensor_device_id == item["sensor_device_id"]
+            Asset.sensor_device_id == sensor_device_id
         ).first()
         if existing:
-            asset_map[item["sensor_device_id"]] = existing
-            print(f"[seed] IoT asset already exists: {item['sensor_device_id']}")
+            asset_map[sensor_device_id] = existing
+            print(f"[seed] IoT asset already exists: {sensor_device_id}")
             continue
         asset = Asset(
             name=item["name"],
             category=item["category"],
-            sensor_device_id=item["sensor_device_id"],
+            sensor_device_id=sensor_device_id,
             status=item["status"],
             location=item["location"],
             purchase_date=item["purchase_date"],
@@ -207,7 +350,7 @@ def seed_iot_assets(db: Session) -> dict[str, Asset]:
         )
         db.add(asset)
         db.flush()
-        asset_map[item["sensor_device_id"]] = asset
+        asset_map[sensor_device_id] = asset
         created += 1
     db.commit()
     print(f"[seed] IoT assets: {created} new asset(s)")
@@ -218,136 +361,6 @@ def seed_iot_assets(db: Session) -> dict[str, Asset]:
 
 def seed_additional_assets(db: Session, user_map: dict[str, User]) -> dict[str, Asset]:
     """Seed non-IoT assets with varied statuses/locations. Returns name→Asset map."""
-    carol  = user_map.get("carol.le@company.com")
-    david  = user_map.get("david.pham@company.com")
-    emma   = user_map.get("emma.vu@company.com")
-    frank  = user_map.get("frank.hoang@company.com")
-    grace  = user_map.get("grace.do@company.com")
-
-    EXTRA_ASSETS = [
-        # ── Laptops ──────────────────────────────────────────────────────────
-        {
-            "name": "MacBook Pro 16-inch (2023)",
-            "category": "Laptop", "status": "available", "location": "Floor 2",
-            "purchase_date": date(2023, 9, 1),  "purchase_price": Decimal("2499.00"),
-            "warranty_months": 12, "usage_hours_per_week": Decimal("40.0"),
-        },
-        {
-            "name": "Lenovo ThinkPad T14s",
-            "category": "Laptop", "status": "assigned", "location": "Floor 2",
-            "purchase_date": date(2022, 7, 12), "purchase_price": Decimal("1350.00"),
-            "warranty_months": 36, "usage_hours_per_week": Decimal("40.0"),
-            "assignee": carol,
-        },
-        {
-            "name": "HP EliteBook 850 G8",
-            "category": "Laptop", "status": "maintenance", "location": "IT Storage",
-            "purchase_date": date(2021, 4, 5),  "purchase_price": Decimal("1200.00"),
-            "warranty_months": 36, "repair_count": 2, "usage_hours_per_week": Decimal("40.0"),
-        },
-        {
-            "name": "Dell Latitude 5530",
-            "category": "Laptop", "status": "assigned", "location": "Floor 3",
-            "purchase_date": date(2023, 1, 20), "purchase_price": Decimal("1150.00"),
-            "warranty_months": 36, "usage_hours_per_week": Decimal("35.0"),
-            "assignee": david,
-        },
-        # ── Monitors ─────────────────────────────────────────────────────────
-        {
-            "name": "Samsung Odyssey G7 32-inch",
-            "category": "Monitor", "status": "available", "location": "Floor 3",
-            "purchase_date": date(2023, 3, 8),  "purchase_price": Decimal("750.00"),
-            "warranty_months": 36, "usage_hours_per_week": Decimal("40.0"),
-        },
-        {
-            "name": "LG UltraWide 34WL500",
-            "category": "Monitor", "status": "assigned", "location": "Floor 1",
-            "purchase_date": date(2022, 11, 1), "purchase_price": Decimal("500.00"),
-            "warranty_months": 24, "usage_hours_per_week": Decimal("35.0"),
-            "assignee": emma,
-        },
-        {
-            "name": "BenQ PD3220U 32-inch",
-            "category": "Monitor", "status": "available", "location": "Conference Room B",
-            "purchase_date": date(2022, 6, 15), "purchase_price": Decimal("850.00"),
-            "warranty_months": 36, "usage_hours_per_week": Decimal("20.0"),
-        },
-        {
-            "name": "ASUS ProArt PA278QV",
-            "category": "Monitor", "status": "maintenance", "location": "IT Storage",
-            "purchase_date": date(2020, 9, 10), "purchase_price": Decimal("420.00"),
-            "warranty_months": 36, "repair_count": 1, "usage_hours_per_week": Decimal("40.0"),
-        },
-        # ── Printers ─────────────────────────────────────────────────────────
-        {
-            "name": "Canon imageCLASS MF445dw",
-            "category": "Printer", "status": "available", "location": "Floor 3",
-            "purchase_date": date(2023, 4, 12), "purchase_price": Decimal("380.00"),
-            "warranty_months": 12, "usage_hours_per_week": Decimal("15.0"),
-        },
-        {
-            "name": "Xerox VersaLink C405",
-            "category": "Printer", "status": "retired", "location": "Storage",
-            "purchase_date": date(2018, 2, 1),  "purchase_price": Decimal("650.00"),
-            "warranty_months": 12, "repair_count": 5, "usage_hours_per_week": Decimal("0.0"),
-        },
-        {
-            "name": "Brother MFC-L8900CDW",
-            "category": "Printer", "status": "maintenance", "location": "Floor 2",
-            "purchase_date": date(2021, 10, 5), "purchase_price": Decimal("520.00"),
-            "warranty_months": 24, "repair_count": 2, "usage_hours_per_week": Decimal("20.0"),
-        },
-        {
-            "name": "HP Color LaserJet E77830",
-            "category": "Printer", "status": "available", "location": "Floor 1",
-            "purchase_date": date(2023, 6, 1),  "purchase_price": Decimal("2200.00"),
-            "warranty_months": 36, "usage_hours_per_week": Decimal("30.0"),
-        },
-        {
-            "name": "Epson WorkForce WF-7840",
-            "category": "Printer", "status": "assigned", "location": "HR Office",
-            "purchase_date": date(2022, 3, 5),  "purchase_price": Decimal("350.00"),
-            "warranty_months": 12, "usage_hours_per_week": Decimal("20.0"),
-            "assignee": grace,
-        },
-        # ── Forklifts ────────────────────────────────────────────────────────
-        {
-            "name": "Crown FC 4500 Series",
-            "category": "Forklift", "status": "available", "location": "Warehouse",
-            "purchase_date": date(2021, 6, 1),  "purchase_price": Decimal("18500.00"),
-            "warranty_months": 24, "usage_hours_per_week": Decimal("45.0"),
-        },
-        {
-            "name": "Hyster E50XN Forklift",
-            "category": "Forklift", "status": "maintenance", "location": "Maintenance Bay",
-            "purchase_date": date(2019, 3, 15), "purchase_price": Decimal("19800.00"),
-            "warranty_months": 24, "repair_count": 3, "usage_hours_per_week": Decimal("50.0"),
-        },
-        # ── Office Equipment ─────────────────────────────────────────────────
-        {
-            "name": "Cisco IP Phone 8841",
-            "category": "Office Equipment", "status": "assigned", "location": "Floor 1",
-            "purchase_date": date(2022, 1, 10), "purchase_price": Decimal("320.00"),
-            "warranty_months": 12, "usage_hours_per_week": Decimal("40.0"),
-            "assignee": frank,
-        },
-        {
-            "name": "Polycom RealPresence Group 300",
-            "category": "Office Equipment", "status": "available", "location": "Conference Room A",
-            "purchase_date": date(2022, 8, 20), "purchase_price": Decimal("1800.00"),
-            "warranty_months": 24, "usage_hours_per_week": Decimal("10.0"),
-        },
-        {
-            "name": "Logitech MeetUp Conference Camera",
-            "category": "Office Equipment", "status": "available", "location": "Conference Room B",
-            "purchase_date": date(2023, 5, 1),  "purchase_price": Decimal("849.00"),
-            "warranty_months": 24, "usage_hours_per_week": Decimal("8.0"),
-        },
-    ]
-
-    sensor_id_by_name = {item["name"]: item["sensor_device_id"] for item in EXTRA_DEVICE_REGISTRY}
-    for item in EXTRA_ASSETS:
-        item["sensor_device_id"] = sensor_id_by_name.get(item["name"])
 
     created = 0
     asset_map: dict[str, Asset] = {}

@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # Absence of OPENAI_API_KEY must NOT crash the server — only a WARNING is logged.
     OPENAI_API_KEY: Optional[str] = None
     AI_ANOMALY_MODEL: str = "gpt-4o-mini"
+    AI_PREDICTIVE_MODEL: str = "gpt-4o-mini"
     AI_ANOMALY_INTERVAL_MINUTES: int = 60
     # Number of most-recent readings per sensor to include in each AI analysis window
     AI_ANOMALY_READINGS_WINDOW: int = 20

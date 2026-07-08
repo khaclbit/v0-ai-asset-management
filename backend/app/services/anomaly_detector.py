@@ -145,6 +145,13 @@ def parse_openai_response(content: str) -> dict:
     if code_block:
         cleaned = code_block.group(1).strip()
 
+    # Some models still wrap the JSON in prose or produce trailing text.
+    # Recover the first balanced JSON object before giving up.
+    if not cleaned.startswith("{") or not cleaned.endswith("}"):
+        extracted = _extract_first_json_object(cleaned)
+        if extracted:
+            cleaned = extracted
+
     try:
         parsed = json.loads(cleaned)
         return {
@@ -159,6 +166,44 @@ def parse_openai_response(content: str) -> dict:
             "confidence": 0.0,
             "explanation": f"parse error: {exc}",
         }
+
+
+def _extract_first_json_object(text: str) -> str | None:
+    """Extract the first balanced JSON object from free-form text."""
+    start = text.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escaped = False
+
+    for index in range(start, len(text)):
+        char = text[index]
+
+        if escaped:
+            escaped = False
+            continue
+
+        if char == "\\" and in_string:
+            escaped = True
+            continue
+
+        if char == '"':
+            in_string = not in_string
+            continue
+
+        if in_string:
+            continue
+
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : index + 1]
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -233,8 +278,9 @@ def run_anomaly_detection_for_asset(
         response = client.chat.completions.create(
             model=settings.AI_ANOMALY_MODEL,
             messages=messages,
+            response_format={"type": "json_object"},
             # temperature=0.0,
-            max_tokens=2048,
+            max_tokens=4096,
         )
         raw_content: str = response.choices[0].message.content or ""
         raw_response_data: dict = response.model_dump() if hasattr(response, "model_dump") else {}

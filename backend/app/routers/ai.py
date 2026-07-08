@@ -45,6 +45,15 @@ def list_recommendations(
     return ai_service.list_recommendations(db, asset_id=asset_id)
 
 
+@router.post("/recommendations/run-now", response_model=list[AiRecommendationResponse])
+def run_recommendations_now(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("Admin", "Asset Manager")),
+):
+    """Run predictive inference across all assets and return fresh alert-only results."""
+    return ai_service.run_inference_for_all_assets(db, current_user, alerts_only=True)
+
+
 @router.post(
     "/recommendations/{rec_id}/approve",
     response_model=AiRecommendationResponse,

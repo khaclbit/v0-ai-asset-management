@@ -68,6 +68,7 @@ export default function AiPredictivePage() {
   const { assets, user } = useStore()
   const [recommendations, setRecommendations] = useState<PredictiveRecommendation[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [runningPredictiveNow, setRunningPredictiveNow] = useState(false)
 
   // Anomaly Detection tab state
   const [anomalies, setAnomalies] = useState<ApiAnomalyDetection[]>([])
@@ -90,8 +91,7 @@ export default function AiPredictivePage() {
       .finally(() => setAnomaliesLoading(false))
   }
 
-  // Load recommendations from real API on mount — only show alert devices (High/Medium risk)
-  useEffect(() => {
+  function loadRecommendations() {
     setIsLoading(true)
     aiApi
       .listRecommendations()
@@ -100,10 +100,15 @@ export default function AiPredictivePage() {
         setRecommendations(mapped.filter((r) => r.risk.level !== "Low"))
       })
       .catch(() => {
-        // API unavailable — keep empty state; no mock fallback
+        setRecommendations([])
       })
       .finally(() => setIsLoading(false))
-  }, [])
+  }
+
+  // Load recommendations from real API on mount — only show alert devices (High/Medium risk)
+  useEffect(() => {
+    loadRecommendations()
+  }, [assets])
 
   // Load anomalies on mount
   useEffect(() => {
@@ -123,6 +128,20 @@ export default function AiPredictivePage() {
       toast.error("Failed to trigger anomaly detection")
     } finally {
       setRunningNow(false)
+    }
+  }
+
+  async function handleRunPredictiveNow() {
+    setRunningPredictiveNow(true)
+    try {
+      const freshItems = await aiApi.runNow()
+      const mapped = freshItems.map((r) => toUiRec(r, assetMap[r.asset_id] ?? r.asset_id))
+      setRecommendations(mapped.filter((r) => r.risk.level !== "Low"))
+      toast.success("Predictive maintenance run completed")
+    } catch {
+      toast.error("Failed to run predictive maintenance")
+    } finally {
+      setRunningPredictiveNow(false)
     }
   }
 
@@ -198,10 +217,26 @@ export default function AiPredictivePage() {
         {/* Summary Card */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingUp className="size-4" />
-              Predictive Summary
-            </CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="size-4" />
+                Predictive Summary
+              </CardTitle>
+              {isAdmin && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={runningPredictiveNow}
+                  onClick={handleRunPredictiveNow}
+                >
+                  {runningPredictiveNow ? (
+                    <><Loader2 className="mr-2 size-4 animate-spin" />Running…</>
+                  ) : (
+                    <><Play className="mr-2 size-4" />Run Predictive Now</>
+                  )}
+                </Button>
+              )}
+            </div>
             <CardDescription>
               Showing alert devices only (High and Medium risk). Low-risk assets are excluded. High-risk items include SLA monitoring.
             </CardDescription>
