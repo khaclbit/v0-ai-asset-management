@@ -43,7 +43,14 @@ DEFAULT_DEVICES = [
     for item in SEED_DEVICE_REGISTRY
     if item.get("sensor_device_id")
 ]
+FAULTY_DEVICES = {}
+forklifts = [d["device_id"] for d in DEFAULT_DEVICES if d["category"] == "Forklift"]
+printers = [d["device_id"] for d in DEFAULT_DEVICES if d["category"] == "Printer"]
 
+if forklifts:
+    FAULTY_DEVICES[forklifts[0]] = "mechanical_wear"
+if printers:
+    FAULTY_DEVICES[printers[0]] = "electrical_stress"
 # ─── Sensor config (must mirror frontend SENSOR_CONFIG / SENSOR_CATEGORY_MAP) ─
 
 SENSOR_CATEGORY_MAP: dict[str, list[str]] = {
@@ -142,18 +149,50 @@ def _step(device_id: str, metric: str, base: float) -> float:
     """
     state   = _state.setdefault(device_id, {})
     target  = base + _time_of_day_offset(metric, base)
-    current = state.get(metric, target)  # start at target on first tick
+    current = state.get(metric, target)
 
-    pull    = 0.05 * (target - current)
-    sigma   = max(abs(base) * 0.01, 0.05)
+    fault_type = FAULTY_DEVICES.get(device_id)
+
+    # -------------------------------------------------------------------------
+    # FAULT INJECTION LOGIC
+    # -------------------------------------------------------------------------
+    if fault_type == "mechanical_wear":
+        # Simulate a failing bearing: High vibration variance + thermal climbing
+        if metric == "temperature":
+            target += 35.0  # Force the target temperature up artificially
+            pull = 0.02 * (target - current) # Slowly climb
+            sigma = max(abs(base) * 0.02, 0.1)
+        elif metric == "vibration":
+            pull = 0.05 * (target - current)
+            sigma = base * 0.60  # Creates massive standard deviation (vibration_std)
+        else:
+            pull = 0.05 * (target - current)
+            sigma = max(abs(base) * 0.01, 0.05)
+
+    elif fault_type == "electrical_stress":
+        # Simulate an electrical fault: Normal mean, but massive current/power spikes
+        pull = 0.05 * (target - current)
+        sigma = max(abs(base) * 0.01, 0.05)
+        
+        if metric in ("current", "power") and random.random() < 0.08: 
+            # 8% chance per tick to surge to 3x-6x normal value. 
+            # We DO NOT save this to `state` so it doesn't drag the mean up permanently.
+            spike_multiplier = random.uniform(3.0, 6.0)
+            return round(current * spike_multiplier, 2)
+
+    else:
+        # Normal healthy behavior
+        pull  = 0.05 * (target - current)
+        sigma = max(abs(base) * 0.01, 0.05)
+
+    # -------------------------------------------------------------------------
+
     noise   = random.gauss(0.0, sigma)
-
     lo, hi  = METRIC_BOUNDS.get(metric, (0.0, 1e9))
     new_val = max(lo, min(hi, current + pull + noise))
 
     state[metric] = new_val
     return round(new_val, 2)
-
 
 # ─── Main publish loop ───────────────────────────────────────────────────────
 

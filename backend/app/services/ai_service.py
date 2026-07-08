@@ -161,12 +161,22 @@ def _openai_predictive_assessment(asset: Asset, features: dict[str, float]) -> O
         "temperature_mean": round(features.get("temperature_mean", 0.0), 2),
         "temperature_std": round(features.get("temperature_std", 0.0), 2),
         "temperature_max": round(features.get("temperature_max", 0.0), 2),
+        "temperature_min": round(features.get("temperature_min", 0.0), 2),
+        "humidity_std": round(features.get("humidity_std", 0.0), 2),
         "humidity_mean": round(features.get("humidity_mean", 0.0), 2),
+        "humidity_max": round(features.get("humidity_max", 0.0), 2),
+        "humidity_min": round(features.get("humidity_min", 0.0), 2),
         "power_mean": round(features.get("power_mean", 0.0), 2),
+        "power_std": round(features.get("power_std", 0.0), 2),
+        "power_max": round(features.get("power_max", 0.0), 2),
+        "power_min": round(features.get("power_min", 0.0), 2),
         "current_mean": round(features.get("current_mean", 0.0), 2),
         "current_max": round(features.get("current_max", 0.0), 2),
+        "current_std": round(features.get("current_std", 0.0), 2),
+        "current_min": round(features.get("current_min", 0.0), 2),
         "vibration_mean": round(features.get("vibration_mean", 0.0), 2),
         "vibration_std": round(features.get("vibration_std", 0.0), 2),
+        "vibration_min": round(features.get("vibration_min", 0.0), 2),
         "vibration_max": round(features.get("vibration_max", 0.0), 2),
         "running_hours_max": round(features.get("running_hours_max", 0.0), 2),
     }
@@ -186,7 +196,7 @@ def _openai_predictive_assessment(asset: Asset, features: dict[str, float]) -> O
                 "- Medium: Early signs of degradation. Single metric deviation (e.g., vibration increasing but temperature stable). Schedule inspection.\n"
                 "- Low: Asset is operating within normal, stable parameters.\n\n"
                 "### OUTPUT FORMAT:\n"
-                "You must think deeply step by step to return ONLY valid JSON. To ensure accurate Chain of Thought reasoning, order your keys exactly as follows:\n"
+                "You must think deeply step by step     to return ONLY valid JSON. To ensure accurate Chain of Thought reasoning, order your keys exactly as follows:\n"
                 "1. \"diagnostic_reasoning\": (string) Step-by-step analysis of the feature correlations.\n"
                 "2. \"top_factors\": (list of strings) The specific metrics driving your conclusion.\n"
                 "3. \"risk_level\": (string) Exactly \"High\", \"Medium\", or \"Low\".\n"
@@ -202,9 +212,9 @@ def _openai_predictive_assessment(asset: Asset, features: dict[str, float]) -> O
                 f"Current Status: {asset.status}\n\n"
                 f"Engineered Sensor Features (Last 24h Window):\n"
                 f"{json.dumps(feature_snapshot, indent=2)}"
-                "\n\n"
-                "You must think deeply step by step to return JSON with keys exactly:\n"
-                "{\"risk_level\": \"High|Medium|Low\", \"confidence\": 0-1 float, \"top_factors\": [string], \"recommendation\": string}"
+                # "\n\n"
+                # "You must think deeply step by step to return JSON with keys exactly:\n"
+                # "{\"risk_level\": \"High|Medium|Low\", \"confidence\": 0-1 float, \"top_factors\": [string], \"recommendation\": string}"
             ),
         },
     ]
@@ -287,10 +297,12 @@ def _engineer_features(
             features[f"{metric}_mean"] = float(np.mean(vals))
             features[f"{metric}_std"] = float(np.std(vals)) if len(vals) > 1 else 0.0
             features[f"{metric}_max"] = float(np.max(vals))
+            features[f"{metric}_min"] = float(np.min(vals))
         else:
             features[f"{metric}_mean"] = 0.0
             features[f"{metric}_std"] = 0.0
             features[f"{metric}_max"] = 0.0
+            features[f"{metric}_min"] = 0.0
     return features
 
 
