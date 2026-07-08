@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Giải thích kiến trúc — AI Asset Management</title>
+<style>
+  :root{
+    --ground:#eef1f6;--panel:#ffffff;--panel-2:#f4f7fb;
+    --ink:#0f1826;--ink-2:#3a465a;--ink-mut:#657188;--hair:#dde3ee;--hair-2:#eaeef5;
+    --accent:#0b9c8b;--accent-ink:#0a7d6f;--accent-soft:rgba(11,156,139,.10);
+    --warn:#b7791f;--warn-soft:rgba(183,121,31,.14);
+    --shadow:0 1px 2px rgba(16,24,38,.04), 0 12px 30px -14px rgba(16,24,38,.18);
+    --f-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+    --f-mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --ground:#0b111d;--panel:#141d2e;--panel-2:#101827;
+    --ink:#e9eef7;--ink-2:#c2ccdc;--ink-mut:#8d9ab0;--hair:#243049;--hair-2:#1b2437;
+    --accent:#33e0c8;--accent-ink:#5ee9d5;--accent-soft:rgba(51,224,200,.10);
+    --warn:#f5b14a;--warn-soft:rgba(245,177,74,.13);
+    --shadow:0 1px 2px rgba(0,0,0,.30), 0 18px 44px -16px rgba(0,0,0,.6);
+  }}
+  :root[data-theme="light"]{
+    --ground:#eef1f6;--panel:#ffffff;--panel-2:#f4f7fb;
+    --ink:#0f1826;--ink-2:#3a465a;--ink-mut:#657188;--hair:#dde3ee;--hair-2:#eaeef5;
+    --accent:#0b9c8b;--accent-ink:#0a7d6f;--accent-soft:rgba(11,156,139,.10);
+    --warn:#b7791f;--warn-soft:rgba(183,121,31,.14);
+    --shadow:0 1px 2px rgba(16,24,38,.04), 0 12px 30px -14px rgba(16,24,38,.18);
+  }
+  :root[data-theme="dark"]{
+    --ground:#0b111d;--panel:#141d2e;--panel-2:#101827;
+    --ink:#e9eef7;--ink-2:#c2ccdc;--ink-mut:#8d9ab0;--hair:#243049;--hair-2:#1b2437;
+    --accent:#33e0c8;--accent-ink:#5ee9d5;--accent-soft:rgba(51,224,200,.10);
+    --warn:#f5b14a;--warn-soft:rgba(245,177,74,.13);
+    --shadow:0 1px 2px rgba(0,0,0,.30), 0 18px 44px -16px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--f-sans);-webkit-font-smoothing:antialiased;line-height:1.6}
+  .wrap{max-width:960px;margin:0 auto;padding:clamp(24px,4vw,56px) clamp(16px,3vw,32px) 80px}
+
+  header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;
+    padding-bottom:20px;border-bottom:1px solid var(--hair);margin-bottom:8px}
+  .eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-ink);
+    display:flex;align-items:center;gap:9px}
+  .eyebrow .b{width:7px;height:7px;border-radius:2px;background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  h1{font-size:clamp(23px,3vw,34px);font-weight:800;letter-spacing:-.02em;margin:12px 0 0;text-wrap:balance}
+  header p{color:var(--ink-mut);margin:10px 0 0;max-width:62ch;font-size:14px}
+  .toolbar{display:flex;gap:8px}
+  .tbtn{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);background:var(--panel);
+    border:1px solid var(--hair);border-radius:9px;padding:9px 13px;cursor:pointer;box-shadow:var(--shadow);
+    display:inline-flex;align-items:center;gap:7px}
+  .tbtn:hover{color:var(--accent-ink);border-color:var(--accent)}
+  .tbtn svg{width:15px;height:15px}
+
+  section{margin-top:44px}
+  .sechead{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+  .sechead .n{font-family:var(--f-mono);font-size:13px;color:var(--accent-ink);letter-spacing:.08em;font-weight:600}
+  h2{font-size:clamp(19px,2.4vw,25px);font-weight:800;letter-spacing:-.02em;margin:0}
+  .sub{color:var(--ink-mut);font-size:14px;margin:0 0 20px;max-width:70ch}
+
+  .zone-tag{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mut);
+    margin:26px 0 10px}
+
+  .card{background:var(--panel);border:1px solid var(--hair);border-radius:14px;box-shadow:var(--shadow);
+    padding:16px 18px 18px;margin-bottom:14px}
+  .chead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .cname{font-weight:700;font-size:15.5px;display:flex;align-items:center;gap:9px}
+  .cname .tag{font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-ink);
+    background:var(--accent-soft);border-radius:6px;padding:3px 7px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:680px){.grid2{grid-template-columns:1fr}}
+  .lbl{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mut);margin-bottom:5px}
+  .txt{font-size:14px;color:var(--ink-2);line-height:1.5;margin:0}
+  .txt b{color:var(--ink);font-weight:600}
+  code{font-family:var(--f-mono);font-size:.92em;background:var(--panel-2);border:1px solid var(--hair-2);
+    border-radius:4px;padding:1px 5px;color:var(--accent-ink)}
+
+  .flow-mini{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:var(--f-mono);font-size:12px;
+    color:var(--ink-2);background:var(--panel-2);border:1px solid var(--hair-2);border-radius:10px;padding:10px 13px;margin-bottom:14px}
+  .flow-mini .arw{color:var(--accent)}
+  .flow-mini b{color:var(--ink)}
+
+  .why-note{font-family:var(--f-mono);font-size:12px;color:var(--ink-mut);background:var(--panel-2);
+    border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:11px 14px;line-height:1.55;margin-top:16px}
+  .why-note b{color:var(--accent-ink)}
+
+  .decisions{display:flex;flex-direction:column;gap:10px}
+  .drow{display:flex;gap:14px;background:var(--panel);border:1px solid var(--hair);border-radius:12px;
+    padding:13px 16px;box-shadow:var(--shadow)}
+  .drow .dn{font-family:var(--f-mono);font-size:11px;color:var(--warn);background:var(--warn-soft);
+    border-radius:6px;padding:3px 8px;flex:0 0 auto;height:fit-content;font-weight:600}
+  .drow .dt{font-size:14px;color:var(--ink-2);line-height:1.5}
+  .drow .dt b{color:var(--ink);font-weight:600}
+
+  footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--hair);font-family:var(--f-mono);
+    font-size:11px;color:var(--ink-mut);text-align:center}
+
+  @media print{
+    @page{margin:14mm}
+    body{background:#fff}
+    .toolbar{display:none}
+    .card,.drow{box-shadow:none;break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="eyebrow"><span class="b"></span> Tài liệu giải thích</div>
+      <h1>Vì sao &amp; cách hoạt động của kiến trúc</h1>
+      <p>Giải thích chi tiết từng thành phần trong <code>architecture.html</code> — lý do lựa chọn công nghệ và cơ chế vận hành thực tế, dựa trên mã nguồn của hệ thống.</p>
+    </div>
+    <div class="toolbar">
+      <button class="tbtn" id="theme"><svg id="tic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg> Giao diện</button>
+      <button class="tbtn" onclick="window.print()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg> In PDF</button>
+    </div>
+  </header>
+
+  <!-- ============ VÌ SAO KIẾN TRÚC 3 TẦNG ============ -->
+  <section>
+    <div class="sechead"><span class="n">00</span><h2>Vì sao chọn kiến trúc 3 tầng + đường ống IoT?</h2></div>
+    <p class="sub">Hệ thống cần xử lý hai loại việc rất khác nhau cùng lúc: <b>giao dịch nghiệp vụ</b> (đăng ký tài sản, duyệt bảo trì — cần chính xác, có giao dịch) và <b>dữ liệu cảm biến tần suất cao</b> (mỗi 5 giây/thiết bị — cần nhanh, không được chặn nhau). Tách thành các tầng riêng (Edge → Application → Data) giúp mở rộng và thay thế từng phần độc lập mà không ảnh hưởng phần còn lại — ví dụ đổi broker MQTT không đụng vào logic AI.</p>
+  </section>
+
+  <!-- ============ EDGE / IOT ============ -->
+  <section>
+    <div class="sechead"><span class="n">01</span><h2>Tầng Edge · IoT</h2></div>
+    <p class="sub">Nơi dữ liệu được sinh ra và đẩy vào hệ thống.</p>
+
+    <div class="card">
+      <div class="chead"><div class="cname">Sensor Simulator <span class="tag">script</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Không có phần cứng thật để demo, nên cần <b>giả lập cảm biến thực tế</b> — dữ liệu phải đủ "thật" để AI phân tích có ý nghĩa, không phải số ngẫu nhiên vô nghĩa.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Dùng mô hình <b>random walk có xu hướng hồi quy về trung bình</b> (giống dao động vật lý thật) + <b>chu kỳ ngày đêm</b> (đỉnh 14h, đáy 2h) cho nhiệt độ/điện năng, giới hạn trong ngưỡng vật lý hợp lý. Cứ mỗi <b>5 giây</b>, 5 thiết bị gửi giá trị của các chỉ số tương ứng.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">Mosquitto (MQTT Broker) <span class="tag">infra</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt"><b>MQTT</b> là chuẩn công nghiệp cho IoT — nhẹ, publish/subscribe, tách rời hoàn toàn thiết bị gửi và backend nhận. Nếu dùng HTTP, backend phải liên tục hỏi vòng (polling) từng thiết bị — tốn tài nguyên và có độ trễ.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Thiết bị gửi (publish) vào topic dạng <code>sensors/{device_id}/{metric}</code>. Backend chỉ cần <b>đăng ký (subscribe)</b> một lần vào <code>sensors/+/+</code> là nhận được mọi thiết bị, mọi chỉ số — broker tự động định tuyến.</p></div>
+      </div>
+    </div>
+
+    <div class="why-note">💡 <b>So với polling truyền thống:</b> polling nghĩa là backend cứ vài giây lại hỏi "có dữ liệu mới chưa?" dù phần lớn câu trả lời là "chưa" — lãng phí. MQTT đảo ngược mô hình: <b>thiết bị chủ động báo khi có dữ liệu</b>, backend chỉ ngồi chờ và xử lý ngay khi có tin nhắn.</div>
+  </section>
+
+  <!-- ============ APPLICATION ============ -->
+  <section>
+    <div class="sechead"><span class="n">02</span><h2>Tầng Application · FastAPI</h2></div>
+    <p class="sub">Nơi dữ liệu được xử lý, lưu trữ và biến thành quyết định.</p>
+
+    <div class="card">
+      <div class="chead"><div class="cname">MQTT Consumer <span class="tag">runtime</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Cần một tiến trình <b>chạy nền liên tục</b> trong vòng đời của FastAPI để lắng nghe broker — không thể để việc này phụ thuộc vào từng request của người dùng.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Khởi động cùng app (trong <code>lifespan</code>), nhận từng tin nhắn và tạo một <b>task bất đồng bộ riêng</b> cho mỗi tin để xử lý song song, tránh tin nhắn sau phải chờ tin trước xử lý xong.</p></div>
+      </div>
+      <div class="why-note">⚙️ <b>Chi tiết kỹ thuật quan trọng:</b> việc ghi vào PostgreSQL dùng thư viện SQLAlchemy <b>đồng bộ (sync)</b>, nhưng consumer chạy bất đồng bộ (async). Nếu ghi trực tiếp sẽ <b>chặn toàn bộ vòng lặp xử lý</b> (không nhận được tin nhắn mới trong lúc ghi). Giải pháp: đẩy việc ghi sang một luồng riêng bằng <code>asyncio.to_thread(...)</code> — vòng lặp chính vẫn rảnh để tiếp tục nhận dữ liệu.</div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">websocket_manager <span class="tag">runtime</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Biểu đồ IoT trên giao diện cần <b>cập nhật ngay lập tức</b> khi có giá trị mới — nếu dùng REST, trình duyệt phải tự hỏi lại liên tục (tốn băng thông, có độ trễ).</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Duy trì danh sách kết nối WebSocket đang mở theo từng thiết bị; ngay sau khi một reading được lưu, quản lý này <b>đẩy (broadcast)</b> giá trị đó tới mọi client đang xem thiết bị đó.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">alert_evaluator <span class="tag">runtime</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Ngưỡng cố định đơn giản (nhiệt độ &gt; 75°C) không đủ linh hoạt cho mọi tình huống thực tế — cần một <b>bộ máy luật có thể cấu hình</b> theo từng loại thiết bị.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Hỗ trợ 6 loại luật (ngưỡng, khoảng giá trị, khớp danh sách, tốc độ thay đổi, không đổi giá trị/flatline, tổng hợp theo cửa sổ thời gian) và kết hợp <b>AND/OR</b>. Khi vi phạm, có <b>cơ chế "cooldown" 5 phút</b> mỗi thiết bị-chỉ số để tránh gửi hàng loạt cảnh báo trùng lặp ("bão cảnh báo").</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">notification_manager <span class="tag">runtime</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Cần đẩy thông báo tới đúng người dùng đang mở trình duyệt <b>ngay lúc đó</b>, mà không cần họ bấm F5 hay ứng dụng phải hỏi lại liên tục.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Dùng <b>Server-Sent Events (SSE)</b> — mỗi người dùng có một hàng đợi (queue) riêng; khi có sự kiện mới (cảnh báo, bất thường), hệ thống đẩy thẳng vào chuông thông báo trên giao diện.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">ai_service — Random Forest <span class="tag">AI · ML</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Cần một mô hình <b>nhanh, ổn định, dễ giải thích</b> để chấm điểm rủi ro hàng loạt thiết bị — không cần độ phức tạp của deep learning, và phải chạy tốt với lượng dữ liệu huấn luyện còn hạn chế.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Trích 18 đặc trưng (trung bình/độ lệch chuẩn/lớn nhất của 6 chỉ số trong 7 ngày), đưa vào <code>RandomForestClassifier</code> để phân loại <b>Thấp/Trung bình/Cao</b>, kèm xác suất từng lớp để tính điểm rủi ro 0–100 và "yếu tố ảnh hưởng" chính.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">anomaly_detector — LLM <span class="tag">AI · LLM</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Random Forest chỉ trả về một con số — không thể phát hiện các kiểu bất thường <b>chưa từng thấy trong lúc huấn luyện</b>, và không giải thích được "vì sao" bằng ngôn ngữ tự nhiên cho người quản lý không rành kỹ thuật.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Đưa 20 giá trị gần nhất của thiết bị vào GPT-4o-mini dưới dạng chuỗi thời gian, yêu cầu mô hình <b>suy luận từng bước (chain-of-thought)</b> như một kỹ sư bảo trì, trả về JSON có cấu trúc: có bất thường không, độ tin cậy, và giải thích bằng lời.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">APScheduler <span class="tag">runtime</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Gọi LLM cho <b>mọi thiết bị sau mỗi lần đọc</b> sẽ quá tốn kém và không cần thiết — bất thường không phải lúc nào cũng xảy ra tức thời.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Chạy job nền theo lịch <b>mỗi 60 phút</b> quét qua toàn bộ thiết bị; nếu thiếu khoá <code>OPENAI_API_KEY</code>, job này <b>tự động không đăng ký</b> — hệ thống vẫn chạy bình thường mà không lỗi.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DATA & EXTERNAL ============ -->
+  <section>
+    <div class="sechead"><span class="n">03</span><h2>Tầng Data &amp; External</h2></div>
+    <p class="sub">Nơi lưu trữ trạng thái và các dịch vụ AI bên ngoài.</p>
+
+    <div class="card">
+      <div class="chead"><div class="cname">PostgreSQL 16 <span class="tag">data</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Dữ liệu nghiệp vụ (tài sản, cấp phát, kiểm toán) cần <b>tính toàn vẹn giao dịch (ACID)</b> — không thể chấp nhận mất hay sai lệch dữ liệu duyệt bảo trì.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Một cơ sở dữ liệu quan hệ duy nhất chứa mọi bảng: tài sản, cấp phát, lịch sử cảm biến, đề xuất AI, cảnh báo, nhật ký kiểm toán — có <b>chỉ mục (index)</b> theo thiết bị + thời gian để truy vấn nhanh.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">model.pkl <span class="tag">data</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Huấn luyện lại mô hình Random Forest mỗi lần dùng sẽ rất chậm — cần <b>lưu sẵn mô hình đã huấn luyện</b> để dùng lại tức thì.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Mô hình được nạp <b>một lần khi cần</b> (lazy-load); nếu file chưa tồn tại (chưa huấn luyện), API trả về lỗi rõ ràng <code>503</code> thay vì crash server.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div class="cname">OpenAI API <span class="tag">external</span></div></div>
+      <div class="grid2">
+        <div><div class="lbl">Vì sao dùng</div><p class="txt">Xây dựng và tự vận hành một LLM riêng để suy luận ngôn ngữ tự nhiên là không khả thi cho một hệ thống ở quy mô này — dùng API sẵn có nhanh và đáng tin cậy hơn nhiều.</p></div>
+        <div><div class="lbl">Cách hoạt động</div><p class="txt">Gọi qua REST API chuẩn; nếu dịch vụ không phản hồi hoặc thiếu khoá API, hệ thống <b>bỏ qua bước phân tích bất thường một cách nhẹ nhàng</b> — không ảnh hưởng các chức năng khác.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3 LUỒNG NGHIỆP VỤ ============ -->
+  <section>
+    <div class="sechead"><span class="n">04</span><h2>Vì sao có 3 luồng xử lý riêng biệt?</h2></div>
+    <p class="sub">Mỗi luồng phục vụ một mục đích khác nhau — gộp chung sẽ làm chậm luồng nhanh và làm luồng nặng thiếu tài nguyên.</p>
+
+    <div class="flow-mini">
+      <b>① Đo đạc &amp; cảnh báo</b> — luôn chạy, phản ứng tức thời <span class="arw">·</span> Simulator → MQTT → Consumer → DB <span class="arw">→</span> WebSocket / SSE
+    </div>
+    <div class="flow-mini">
+      <b>② Bảo trì dự đoán</b> — theo yêu cầu, cần độ chính xác <span class="arw">·</span> Yêu cầu → trích đặc trưng 7 ngày → Random Forest → <b>người duyệt</b>
+    </div>
+    <div class="flow-mini">
+      <b>③ Phát hiện bất thường</b> — theo lịch, cần suy luận sâu <span class="arw">·</span> Lịch 60 phút → 20 giá trị gần nhất → LLM → nếu tin cậy ≥ 0.7 → thông báo
+    </div>
+
+    <div class="why-note">💡 <b>Vì sao luồng ① không cần con người duyệt nhưng ② và ③ thì có?</b> Luồng ① chỉ là <i>quan sát &amp; báo động</i> — không thay đổi trạng thái tài sản. Luồng ② và ③ tạo ra <i>đề xuất hành động</i> (lên lịch bảo trì) nên bắt buộc phải qua người có thẩm quyền để tránh AI tự ý quyết định sai.</div>
+  </section>
+
+  <!-- ============ QUYẾT ĐỊNH THIẾT KẾ ĐÁNG CHÚ Ý ============ -->
+  <section>
+    <div class="sechead"><span class="n">05</span><h2>Các quyết định thiết kế đáng chú ý</h2></div>
+    <p class="sub">Những lựa chọn không hiển nhiên nhưng có lý do kỹ thuật rõ ràng.</p>
+    <div class="decisions">
+      <div class="drow"><span class="dn">01</span><span class="dt"><b>Ghi dữ liệu cảm biến qua luồng riêng (to_thread)</b> — tránh việc ghi CSDL đồng bộ làm chặn toàn bộ vòng lặp bất đồng bộ đang xử lý hàng trăm tin nhắn MQTT mỗi giây.</span></div>
+      <div class="drow"><span class="dn">02</span><span class="dt"><b>Không dùng khoá ngoại (foreign key) giữa reading và asset</b> — vì tốc độ ghi rất cao; ràng buộc khoá ngoại có thể gây khoá (lock) không cần thiết. Việc khớp asset chỉ thực hiện khi truy vấn.</span></div>
+      <div class="drow"><span class="dn">03</span><span class="dt"><b>Cột "metric" là chuỗi, không phải kiểu liệt kê (ENUM)</b> — thêm loại cảm biến mới chỉ cần thêm dữ liệu, không cần thay đổi cấu trúc bảng (vốn có thể gây gián đoạn).</span></div>
+      <div class="drow"><span class="dn">04</span><span class="dt"><b>Độ tin cậy AI = xác suất bất thường, không phải độ chắc chắn của mô hình</b> — cách diễn giải này giúp người dùng hiểu đúng: con số cao nghĩa là "khả năng có vấn đề cao", không phải "AI chắc chắn 100%".</span></div>
+      <div class="drow"><span class="dn">05</span><span class="dt"><b>Mọi thứ đều có "lối thoát an toàn"</b> — thiếu khoá OpenAI thì bỏ qua bước LLM; mất kết nối MQTT thì tự kết nối lại sau 5 giây; thiếu model.pkl thì trả lỗi rõ ràng. Hệ thống không bao giờ sập vì một thành phần phụ trợ.</span></div>
+    </div>
+  </section>
+
+  <footer>Giải thích kiến trúc · Hệ thống Quản lý Tài sản ứng dụng AI · v2.2 · xem sơ đồ trực quan tại architecture.html</footer>
+
+</div>
+<script>
+(function(){
+  var root=document.documentElement, ic=document.getElementById('tic');
+  function isDark(){var t=root.getAttribute('data-theme');return t?t==='dark':matchMedia('(prefers-color-scheme:dark)').matches}
+  function setIcon(d){ic.innerHTML=d?'<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'}
+  document.getElementById('theme').addEventListener('click',function(){var d=!isDark();root.setAttribute('data-theme',d?'dark':'light');setIcon(d)});
+  setIcon(isDark());
+})();
+</script>
+</body>
+</html>
