@@ -1,0 +1,317 @@
+@startuml class-diagram
+!theme plain
+skinparam backgroundColor #FAFAFA
+skinparam classBackgroundColor #F8FAFF
+skinparam classBorderColor #4895EF
+skinparam classHeaderBackgroundColor #0F3460
+skinparam classFontColor #1A2E4A
+skinparam classFontSize 10
+skinparam ArrowColor #4A5568
+skinparam NoteBackgroundColor #FFFBEA
+skinparam NoteBorderColor #F4A261
+skinparam packageBackgroundColor #F0F7FF
+skinparam packageBorderColor #C5DCF5
+
+title AI-Powered Asset Management System\nClass Diagram (Domain Model)
+
+' ═══════════════════════════════════════════════════
+' ENUMERATIONS
+' ═══════════════════════════════════════════════════
+
+enum UserRole {
+  ADMIN = "Admin"
+  ASSET_MANAGER = "Asset Manager"
+  STAFF = "Staff"
+  AUDITOR = "Auditor"
+}
+
+enum AssetStatus {
+  REGISTERED = "registered"
+  AVAILABLE = "available"
+  ASSIGNED = "assigned"
+  MAINTENANCE = "maintenance"
+  RETIRED = "retired"
+}
+
+enum AssetCategory {
+  LAPTOP = "Laptop"
+  MONITOR = "Monitor"
+  PRINTER = "Printer"
+  FORKLIFT = "Forklift"
+  OFFICE_EQUIPMENT = "Office Equipment"
+}
+
+enum AssignmentStatus {
+  REQUESTED = "requested"
+  ACTIVE = "active"
+  REJECTED = "rejected"
+  CLOSED = "closed"
+}
+
+enum MaintenanceStatus {
+  SCHEDULED = "scheduled"
+  IN_PROGRESS = "in_progress"
+  COMPLETED = "completed"
+  BLOCKED = "blocked"
+}
+
+' ═══════════════════════════════════════════════════
+' CORE DOMAIN
+' ═══════════════════════════════════════════════════
+
+package "Core Domain" {
+
+  class User {
+    +UUID id
+    +String email
+    +String hashed_password
+    +String full_name
+    +UserRole role
+    +String department
+    +Boolean is_active
+    +DateTime created_at
+  }
+
+  class Asset {
+    +UUID id
+    +String name
+    +AssetCategory category
+    +AssetStatus status
+    +String location
+    +UUID assignee_id
+    +Date purchase_date
+    +Decimal purchase_price
+    +Integer warranty_months
+    +Integer repair_count
+    +Decimal usage_hours_per_week
+    +String sensor_device_id
+    +String notes
+    +DateTime last_updated
+    --
+    +can_transition_to(new_status: str): bool
+  }
+
+  class Assignment {
+    +UUID id
+    +UUID asset_id
+    +UUID assignee_id
+    +AssignmentStatus status
+    +Date requested_date
+    +Date approved_date
+    +Date expected_return_date
+    +Date return_date
+    +String reject_reason
+    +String notes
+    +DateTime created_at
+  }
+
+  class MaintenanceRecord {
+    +UUID id
+    +UUID asset_id
+    +String title
+    +String description
+    +MaintenanceStatus status
+    +Date scheduled_date
+    +Date completed_date
+    +String notes
+    +String blocked_reason
+    +String ai_correlation_id
+    +DateTime created_at
+    --
+    +can_transition_to(new_status: str): bool
+  }
+
+}
+
+' ═══════════════════════════════════════════════════
+' IoT & REALTIME
+' ═══════════════════════════════════════════════════
+
+package "IoT & Realtime" {
+
+  class SensorReading {
+    +UUID id
+    +String device_id
+    +String asset_id
+    +String metric
+    +Float value
+    +String unit
+    +DateTime recorded_at
+  }
+
+  class Notification {
+    +UUID id
+    +UUID user_id
+    +String type
+    +String title
+    +String message
+    +Boolean is_read
+    +String href
+    +DateTime created_at
+  }
+
+}
+
+' ═══════════════════════════════════════════════════
+' AI & ANALYTICS
+' ═══════════════════════════════════════════════════
+
+package "AI & Analytics" {
+
+  class AiRecommendation {
+    +UUID id
+    +UUID asset_id
+    +String recommendation
+    +Float confidence
+    +String risk_level
+    +Float risk_score
+    +JSONB top_factors
+    +String correlation_id
+    +UUID approved_by
+    +DateTime approved_at
+    +String action_state
+    +String defer_reason
+    +DateTime sla_due_at
+    +DateTime created_at
+  }
+
+  class AnomalyDetection {
+    +UUID id
+    +UUID asset_id
+    +String sensor_device_id
+    +DateTime window_start
+    +DateTime window_end
+    +String model_used
+    +Boolean is_anomaly
+    +Float confidence
+    +String explanation
+    +JSONB raw_response
+    +DateTime created_at
+  }
+
+}
+
+' ═══════════════════════════════════════════════════
+' ALERT RULES ENGINE (v2.3)
+' ═══════════════════════════════════════════════════
+
+package "Alert Rules Engine (v2.3)" {
+
+  class AlertRule {
+    +UUID id
+    +String name
+    +String description
+    +String sensor_device_id
+    +UUID asset_id
+    +Boolean is_enabled
+    +String severity
+    +Integer cooldown_minutes
+    +Integer escalation_minutes
+    +UUID created_by
+    +DateTime created_at
+    +DateTime updated_at
+  }
+
+  class AlertRuleCondition {
+    +UUID id
+    +UUID rule_id
+    +String category
+    +String type
+    +JSONB parameters
+    +String logic_op
+    +UUID parent_id
+    +DateTime created_at
+  }
+
+  class AlertRuleChannel {
+    +UUID id
+    +UUID rule_id
+    +String channel
+    +JSONB config
+    +DateTime created_at
+  }
+
+  class AlertEvent {
+    +UUID id
+    +UUID rule_id
+    +UUID asset_id
+    +DateTime triggered_at
+    +JSONB reading_snapshot
+    +String severity
+    +Boolean acknowledged
+    +UUID acknowledged_by
+    +DateTime acknowledged_at
+  }
+
+}
+
+' ═══════════════════════════════════════════════════
+' RELATIONSHIPS — Core
+' ═══════════════════════════════════════════════════
+
+User "1" --> "0..*" Asset : "assignee\n(SET NULL)"
+User "1" --> "0..*" Assignment : "makes\n(RESTRICT)"
+User "1" --> "0..*" Notification : "receives\n(CASCADE)"
+User "1" --> "0..*" AiRecommendation : "approves\n(SET NULL)"
+User "1" --> "0..*" AlertRule : "creates\n(SET NULL)"
+
+Asset "1" --> "0..*" Assignment : "subject of\n(RESTRICT)"
+Asset "1" --> "0..*" MaintenanceRecord : "has\n(RESTRICT)"
+Asset "1" --> "0..*" AiRecommendation : "generates\n(CASCADE)"
+Asset "1" --> "0..*" AlertRule : "monitored by\n(CASCADE)"
+Asset "1" --> "0..*" AlertEvent : "fires\n(CASCADE)"
+
+' ═══════════════════════════════════════════════════
+' RELATIONSHIPS — Soft links (no FK)
+' ═══════════════════════════════════════════════════
+
+SensorReading "0..*" ..> Asset : "linked by sensor_device_id\n(no FK — IoT pattern)"
+AnomalyDetection "0..*" ..> Asset : "linked by asset_id\n(no FK — IoT pattern)"
+MaintenanceRecord "0..*" ..> AiRecommendation : "ai_correlation_id\n(traceability)"
+
+' ═══════════════════════════════════════════════════
+' RELATIONSHIPS — Alert Rules
+' ═══════════════════════════════════════════════════
+
+AlertRule "1" *-- "0..*" AlertRuleCondition : "conditions\n(CASCADE)"
+AlertRule "1" *-- "0..*" AlertRuleChannel : "channels\n(CASCADE)"
+AlertRule "1" --> "0..*" AlertEvent : "fires\n(CASCADE)"
+AlertRuleCondition "0..1" --> "0..*" AlertRuleCondition : "parent_id\n(tree structure)"
+
+' ═══════════════════════════════════════════════════
+' ENUM USAGE
+' ═══════════════════════════════════════════════════
+
+User ..> UserRole : <<uses>>
+Asset ..> AssetStatus : <<uses>>
+Asset ..> AssetCategory : <<uses>>
+Assignment ..> AssignmentStatus : <<uses>>
+MaintenanceRecord ..> MaintenanceStatus : <<uses>>
+
+' ═══════════════════════════════════════════════════
+' NOTES
+' ═══════════════════════════════════════════════════
+
+note right of SensorReading
+  IoT Pattern:
+  FK omitted to preserve
+  MQTT ingestion throughput.
+  Joined at query time via
+  sensor_device_id string.
+end note
+
+note right of AlertRuleCondition
+  Supports unlimited nesting depth
+  via self-referencing parent_id.
+  Categories: value / temporal /
+  composite (AND/OR/NOT/SEQ).
+end note
+
+note bottom of AiRecommendation
+  Human-in-the-loop:
+  action_state = pending | approved | deferred
+  Approval required before any
+  maintenance action is triggered.
+end note
+
+@enduml
