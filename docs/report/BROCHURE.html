@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-Powered Asset Management System — Project Summary</title>
+  <style>
+    /* ─── Reset & Base ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.45;
+      color: #1a1a2e;
+      background: #f0f2f5;
+    }
+
+    /* ─── A4 Page Shell ─────────────────────────────────────── */
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      background: #ffffff;
+      box-shadow: 0 4px 32px rgba(0,0,0,.15);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+    }
+
+    /* ─── Header Banner ─────────────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 50%, #0a1628 100%);
+      color: #fff;
+      padding: 18px 24px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -30px; right: -30px;
+      width: 120px; height: 120px;
+      border-radius: 50%;
+      background: rgba(230,57,70,.25);
+    }
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -20px; left: 40%;
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: rgba(72,149,239,.2);
+    }
+    .header h1 {
+      font-size: 18pt;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      line-height: 1.15;
+    }
+    .header h1 span { color: #4895ef; }
+    .header .subtitle {
+      font-size: 8.5pt;
+      color: rgba(255,255,255,.65);
+      margin-top: 4px;
+      font-weight: 400;
+      letter-spacing: 0.3px;
+    }
+    .badge-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.2);
+      color: rgba(255,255,255,.9);
+      font-size: 7.5pt;
+      padding: 2px 9px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .badge.accent { background: #e63946; border-color: #e63946; color: #fff; }
+    .badge.blue   { background: #4895ef; border-color: #4895ef; color: #fff; }
+
+    /* ─── Main Content ──────────────────────────────────────── */
+    .content {
+      padding: 16px 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto auto;
+      gap: 12px 16px;
+    }
+
+    /* ─── Section Cards ─────────────────────────────────────── */
+    .card {
+      background: #fff;
+      border: 1px solid #e8ecf0;
+      border-radius: 8px;
+      padding: 11px 13px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--accent, #4895ef);
+      border-radius: 8px 0 0 8px;
+    }
+    .card.full-width { grid-column: 1 / -1; }
+    .card.green { --accent: #2dc653; }
+    .card.purple { --accent: #7b2d8b; }
+    .card.orange { --accent: #f4a261; }
+    .card.red    { --accent: #e63946; }
+    .card.teal   { --accent: #0cb4ce; }
+
+    .card-title {
+      font-size: 9pt;
+      font-weight: 700;
+      color: #0f3460;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .card-title .icon { font-size: 11pt; }
+
+    /* ─── Goal Card ─────────────────────────────────────────── */
+    .goal-card {
+      grid-column: 1 / -1;
+      background: linear-gradient(135deg, #eef6ff 0%, #f8faff 100%);
+      border-color: #c5dcf5;
+    }
+    .goal-card blockquote {
+      font-style: italic;
+      color: #2d4a7a;
+      font-size: 9.5pt;
+      line-height: 1.5;
+      border-left: 3px solid #4895ef;
+      padding-left: 10px;
+      margin: 6px 0 0;
+    }
+    .goal-text {
+      color: #1a2e4a;
+      font-size: 9.5pt;
+      line-height: 1.5;
+    }
+
+    /* ─── Feature Tables ─────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.5pt;
+    }
+    thead tr {
+      background: #f0f4f8;
+    }
+    thead th {
+      padding: 4px 6px;
+      text-align: left;
+      font-weight: 600;
+      color: #4a5568;
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    tbody tr { border-bottom: 1px solid #f0f0f0; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td { padding: 4px 6px; color: #2d3748; vertical-align: top; }
+    tbody td:first-child { font-weight: 500; white-space: nowrap; }
+    tbody td em { color: #718096; font-size: 8pt; }
+
+    /* ─── Tech Stack ─────────────────────────────────────────── */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+    }
+    .tech-item {
+      background: #f7f9fc;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      padding: 5px 7px;
+    }
+    .tech-layer {
+      font-size: 7pt;
+      font-weight: 700;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .tech-value {
+      font-size: 8pt;
+      color: #1a2e4a;
+      font-weight: 500;
+      margin-top: 1px;
+      line-height: 1.3;
+    }
+
+    /* ─── Achievements ───────────────────────────────────────── */
+    .achievement-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .achievement-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      font-size: 8.5pt;
+      line-height: 1.4;
+    }
+    .achievement-list li .num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      background: #0f3460;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 7.5pt;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .achievement-list li strong { color: #0f3460; }
+    .achievement-list li code {
+      background: #f0f4f8;
+      color: #c0392b;
+      padding: 0 3px;
+      border-radius: 3px;
+      font-size: 7.5pt;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+
+    /* ─── Stats Bar ──────────────────────────────────────────── */
+    .stats-bar {
+      grid-column: 1 / -1;
+      background: #f7f9fc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      text-align: center;
+    }
+    .stat-item {}
+    .stat-value {
+      font-size: 14pt;
+      font-weight: 800;
+      color: #0f3460;
+      line-height: 1;
+    }
+    .stat-value span { font-size: 9pt; color: #4895ef; }
+    .stat-label {
+      font-size: 7.5pt;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-top: 2px;
+    }
+    .stat-divider {
+      width: 1px;
+      background: #e2e8f0;
+      margin: 0 auto;
+    }
+
+    /* ─── Deliverables ───────────────────────────────────────── */
+    .deliverables {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .deliverable-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #f0f4f8;
+      border: 1px solid #d0dae8;
+      border-radius: 20px;
+      padding: 3px 9px;
+      font-size: 8pt;
+      color: #2d4a7a;
+    }
+    .deliverable-pill .icon { font-size: 9.5pt; }
+
+    /* ─── Footer ─────────────────────────────────────────────── */
+    .footer {
+      background: #0f3460;
+      color: rgba(255,255,255,.55);
+      font-size: 7.5pt;
+      padding: 8px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer strong { color: rgba(255,255,255,.85); }
+
+    /* ─── Print Styles ───────────────────────────────────────── */
+    @media print {
+      body { background: #fff; }
+      .page {
+        margin: 0;
+        box-shadow: none;
+        width: 100%;
+        min-height: 100%;
+      }
+      @page {
+        size: A4;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+  <div class="header">
+    <h1><span>AI-Powered</span> Asset Management System</h1>
+    <div class="subtitle">One-Page Project Summary &nbsp;·&nbsp; HCMUS &nbsp;·&nbsp; AI Management Systems Course</div>
+    <div class="badge-row">
+      <span class="badge accent">v2.2 Shipped</span>
+      <span class="badge blue">v2.3 In Progress</span>
+      <span class="badge">Next.js 15</span>
+      <span class="badge">FastAPI</span>
+      <span class="badge">PostgreSQL 16</span>
+      <span class="badge">scikit-learn</span>
+      <span class="badge">OpenAI</span>
+      <span class="badge">MQTT</span>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ══════════════════════════════════════════ -->
+  <div class="content">
+
+    <!-- Goal -->
+    <div class="card goal-card">
+      <div class="card-title"><span class="icon">🎯</span> Project Goal</div>
+      <p class="goal-text">Build a <strong>production-grade enterprise asset management platform</strong> that unifies physical asset lifecycle tracking, real-time IoT sensor monitoring, and AI-driven predictive maintenance into a single web application — eliminating reactive failures through data-driven, <em>human-approved</em> maintenance decisions.</p>
+      <blockquote>"Know the state of every asset, anticipate failures before they happen, and give the right people the right information at the right time."</blockquote>
+    </div>
+
+    <!-- Core Platform Features -->
+    <div class="card green">
+      <div class="card-title"><span class="icon">⚙️</span> Core Platform</div>
+      <table>
+        <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>🗂️ Asset Registry</td><td>Full CRUD + enforced state machine <em>(Registered → Available → Assigned → Maintenance → Retired)</em></td></tr>
+          <tr><td>📋 Assignments</td><td>Borrow/return workflow with Manager approval gate &amp; deadline tracking</td></tr>
+          <tr><td>🔧 Maintenance</td><td>Work orders — Scheduled → In Progress → Completed lifecycle</td></tr>
+          <tr><td>🔐 RBAC</td><td>4-role JWT auth (Admin / Asset Manager / Staff / Auditor) enforced server-side</td></tr>
+          <tr><td>📜 Audit Log</td><td>Append-only immutable event ledger for compliance</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- AI & IoT Features -->
+    <div class="card purple">
+      <div class="card-title"><span class="icon">🤖</span> AI &amp; IoT Intelligence</div>
+      <table>
+        <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td>📡 IoT Pipeline</td><td>MQTT → PostgreSQL → WebSocket live charts <em>(6 metrics × 5 devices × 5s)</em></td></tr>
+          <tr><td>🤖 Predictive AI</td><td>Random Forest · 18 engineered features · Low / Medium / High / Critical risk</td></tr>
+          <tr><td>🔔 Real-Time Alerts</td><td>SSE push notifications for threshold breaches &amp; workflow events</td></tr>
+          <tr><td>🧠 LLM Anomaly</td><td>GPT-4o-mini explains unusual sensor patterns in plain language <em>(v2.3)</em></td></tr>
+          <tr><td>⚡ Alert Rules</td><td>Multi-category engine: Value / Temporal / Composite / Delivery <em>(v2.3)</em></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-value">60<span>+</span></div>
+        <div class="stat-label">REST Endpoints</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">8</div>
+        <div class="stat-label">DB Tables</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">18</div>
+        <div class="stat-label">AI Features</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value">4</div>
+        <div class="stat-label">User Roles</div>
+      </div>
+    </div>
+
+    <!-- Tech Stack -->
+    <div class="card teal">
+      <div class="card-title"><span class="icon">🛠️</span> Tech Stack</div>
+      <div class="tech-grid">
+        <div class="tech-item"><div class="tech-layer">Frontend</div><div class="tech-value">Next.js 15 · TypeScript · shadcn/ui · Recharts</div></div>
+        <div class="tech-item"><div class="tech-layer">Backend</div><div class="tech-value">FastAPI (Python 3.12) · SQLAlchemy · Alembic</div></div>
+        <div class="tech-item"><div class="tech-layer">Database</div><div class="tech-value">PostgreSQL 16 · 8 tables · Alembic migrations</div></div>
+        <div class="tech-item"><div class="tech-layer">IoT</div><div class="tech-value">Mosquitto MQTT · aiomqtt · WebSocket</div></div>
+        <div class="tech-item"><div class="tech-layer">AI / ML</div><div class="tech-value">scikit-learn RandomForest · 18 features · joblib</div></div>
+        <div class="tech-item"><div class="tech-layer">LLM + Infra</div><div class="tech-value">OpenAI API · Docker Compose · JWT + bcrypt</div></div>
+      </div>
+    </div>
+
+    <!-- Achievements -->
+    <div class="card red">
+      <div class="card-title"><span class="icon">🏆</span> Standout Technical Achievements</div>
+      <ul class="achievement-list">
+        <li>
+          <span class="num">1</span>
+          <span><strong>End-to-end async IoT pipeline</strong> — MQTT consumer uses <code>asyncio.to_thread</code> for non-blocking DB writes while simultaneously broadcasting to WebSocket clients and evaluating alert thresholds in a single event loop pass.</span>
+        </li>
+        <li>
+          <span class="num">2</span>
+          <span><strong>Human-in-the-loop AI governance</strong> — Every AI recommendation (Random Forest + LLM anomaly) requires explicit Manager approval before triggering any maintenance action. No autonomous actuation.</span>
+        </li>
+        <li>
+          <span class="num">3</span>
+          <span><strong>Multi-tab safe SSE notifications</strong> — <code>NotificationManager</code> maintains a separate <code>asyncio.Queue</code> per user per connection — all open tabs receive every real-time event without duplication.</span>
+        </li>
+        <li>
+          <span class="num">4</span>
+          <span><strong>Stateless demo fallback</strong> — Frontend gracefully degrades to in-memory mock data when the backend is unavailable, enabling full UI demonstration without infrastructure.</span>
+        </li>
+        <li>
+          <span class="num">5</span>
+          <span><strong>OpenAI anomaly explanation</strong> <em>(v2.3)</em> — LLM receives a structured sensor window and returns plain-language anomaly explanations (e.g., <em>"temperature 3× above 7-day baseline, correlated with elevated vibration"</em>).</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Deliverables -->
+    <div class="card full-width" style="--accent: #f4a261;">
+      <div class="card-title"><span class="icon">📁</span> Deliverables</div>
+      <div class="deliverables">
+        <span class="deliverable-pill"><span class="icon">💻</span> Source Code — <code>/backend</code> (FastAPI) · <code>/frontend</code> (Next.js)</span>
+        <span class="deliverable-pill"><span class="icon">📄</span> Full Report — <code>docs/report/REPORT.md</code></span>
+        <span class="deliverable-pill"><span class="icon">🗺️</span> Architecture Diagrams — <code>docs/uml/</code></span>
+        <span class="deliverable-pill"><span class="icon">🎬</span> Demo Video — <code>presentations/</code></span>
+        <span class="deliverable-pill"><span class="icon">🔗</span> API Docs — Swagger UI at <code>localhost:8000/docs</code></span>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- ═══ FOOTER ════════════════════════════════════════════════ -->
+  <div class="footer">
+    <span><strong>AI-Powered Asset Management System</strong> &nbsp;·&nbsp; HCMUS — AI Management Systems</span>
+    <span><strong>v2.2</strong> Shipped &nbsp;·&nbsp; <strong>v2.3</strong> In Progress &nbsp;·&nbsp; Next.js 15 + FastAPI + PostgreSQL + MQTT + scikit-learn + OpenAI</span>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>

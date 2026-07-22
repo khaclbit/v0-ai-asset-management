@@ -1,0 +1,127 @@
+@startuml use-case-diagram
+!theme plain
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam backgroundColor #FAFAFA
+skinparam ArrowColor #4A5568
+skinparam ActorBorderColor #2D3748
+skinparam ActorBackgroundColor #EBF4FF
+skinparam UsecaseBorderColor #4895EF
+skinparam UsecaseBackgroundColor #F0F7FF
+skinparam UsecaseFontColor #1A2E4A
+skinparam NoteBackgroundColor #FFFBEA
+skinparam NoteBorderColor #F4A261
+
+title AI-Powered Asset Management System\nUse Case Diagram
+
+' ─── Actors ──────────────────────────────────────────────────
+actor "Admin" as Admin #EBF4FF
+actor "Asset Manager" as Manager #E8F5E9
+actor "Staff" as Staff #FFF3E0
+actor "Auditor" as Auditor #F3E5F5
+actor "IoT Sensor\n(System)" as IoT #E0F2F1
+
+' ─── System Boundary ─────────────────────────────────────────
+rectangle "AI Asset Management System" {
+
+  ' ─── Admin Use Cases ───────────────────────────────────────
+  package "Administration" {
+    usecase "UC-01\nManage Users" as UC01
+    usecase "UC-02\nConfigure System\nSettings" as UC02
+  }
+
+  ' ─── Asset & Workflow Use Cases ────────────────────────────
+  package "Asset & Workflow Management" {
+    usecase "UC-03\nManage Assets\n(CRUD + Lifecycle)" as UC03
+    usecase "UC-04\nApprove / Reject\nAssignments" as UC04
+    usecase "UC-05\nManage Maintenance\nRecords" as UC05
+    usecase "UC-09\nRequest Asset\nAssignment" as UC09
+    usecase "UC-10\nReturn Asset" as UC10
+    usecase "UC-11\nSubmit Maintenance\nRequest" as UC11
+  }
+
+  ' ─── AI & IoT Use Cases ────────────────────────────────────
+  package "AI & IoT Intelligence" {
+    usecase "UC-06\nTrigger AI\nInference" as UC06
+    usecase "UC-07\nApprove / Defer\nAI Recommendation" as UC07
+    usecase "UC-08\nView IoT Dashboard\n& Alerts" as UC08
+    usecase "UC-15\nPublish Sensor\nReadings (MQTT)" as UC15
+    usecase "UC-16\nAuto-trigger\nThreshold Alert" as UC16
+  }
+
+  ' ─── Reporting & Notifications ─────────────────────────────
+  package "Reporting & Notifications" {
+    usecase "UC-12\nView Notifications\n(SSE)" as UC12
+    usecase "UC-13\nView Audit Log" as UC13
+    usecase "UC-14\nView Reports &\nAnalytics" as UC14
+  }
+
+}
+
+' ─── Admin Associations ──────────────────────────────────────
+Admin --> UC01
+Admin --> UC02
+Admin --> UC03
+Admin --> UC04
+Admin --> UC05
+Admin --> UC06
+Admin --> UC07
+Admin --> UC08
+Admin --> UC12
+Admin --> UC13
+Admin --> UC14
+
+' ─── Asset Manager Associations ──────────────────────────────
+Manager --> UC03
+Manager --> UC04
+Manager --> UC05
+Manager --> UC06
+Manager --> UC07
+Manager --> UC08
+Manager --> UC12
+Manager --> UC14
+
+' ─── Staff Associations ──────────────────────────────────────
+Staff --> UC09
+Staff --> UC10
+Staff --> UC11
+Staff --> UC12
+
+' ─── Auditor Associations ────────────────────────────────────
+Auditor --> UC13
+Auditor --> UC14
+Auditor --> UC12
+
+' ─── IoT System Actor ────────────────────────────────────────
+IoT --> UC15
+UC15 ..> UC16 : <<triggers>>
+
+' ─── Include / Extend relationships ─────────────────────────
+UC04 ..> UC03 : <<extend>>\n(updates asset status)
+UC07 ..> UC05 : <<extend>>\n(creates maintenance record\nif approved)
+UC16 ..> UC12 : <<include>>\n(pushes SSE\nnotification)
+
+' ─── Notes ──────────────────────────────────────────────────
+note right of UC06
+  Runs Random Forest inference
+  on 7-day sensor history.
+  Produces risk level:
+  Low / Medium / High / Critical
+  with 18 engineered features.
+end note
+
+note right of UC16
+  MQTT consumer evaluates every
+  incoming sensor reading against
+  thresholds (5-min cooldown).
+  Fires SSE to all Managers/Admins.
+end note
+
+note bottom of UC07
+  Human-in-the-loop governance:
+  No autonomous actuation.
+  Every AI action requires
+  explicit Manager approval.
+end note
+
+@enduml
