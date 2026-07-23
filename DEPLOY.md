@@ -1,123 +1,123 @@
 # Deployment Guide — AI Asset Management System
 
-**Recommended stack (free tier, ~10 phút setup):**
+> **Mục tiêu:** Deploy toàn bộ hệ thống lên cloud **hoàn toàn miễn phí** — không cần thẻ tín dụng, không trial có hạn, ~20 phút setup.
 
-| Service | Platform | Hostname |
-|---------|----------|---------|
-| Frontend (Next.js) | **Vercel** | `your-app.vercel.app` |
-| Backend API (FastAPI) | **Railway** | `your-api.up.railway.app` |
-| Database (PostgreSQL 16) | **Railway** add-on | auto-configured |
-| MQTT Broker | **HiveMQ Cloud** free | `xxxxx.s1.eu.hivemq.cloud` |
+## Stack
 
----
+| Service | Platform | Free Tier | CC cần? |
+|---------|----------|-----------|---------|
+| Frontend (Next.js 15) | **Vercel** | Miễn phí vĩnh viễn | ❌ Không |
+| Backend API (FastAPI) | **Render** | 750h/tháng, sleep sau 15 phút idle | ❌ Không |
+| Database (PostgreSQL 16) | **Neon** | 512 MB storage | ❌ Không |
+| MQTT Broker | **broker.emqx.io** | Public broker, không cần setup | ❌ Không |
 
-## Step 1 — MQTT Cloud Broker (HiveMQ Free)
-
-1. Tạo account tại [hivemq.com/mqtt-cloud-broker](https://www.hivemq.com/mqtt-cloud-broker/)
-2. Tạo **Free Cluster** → nhận `hostname` dạng `xxxxx.s1.eu.hivemq.cloud`
-3. Tạo **Credentials** (username + password) trong tab *Access Management*
-4. Lưu lại: `MQTT_BROKER_HOST`, `MQTT_BROKER_PORT=8883`, `MQTT_USERNAME`, `MQTT_PASSWORD`
-
-> HiveMQ Free hỗ trợ TLS (port 8883) — cần update `consumer.py` nếu dùng TLS.
-> Hoặc dùng **broker.emqx.io** (public, port 1883, không cần auth) để test nhanh.
+> **Lưu ý về Render free tier:** Service tự *sleep* sau 15 phút không có request. Request đầu tiên sau sleep sẽ mất ~30–50 giây để wake up — hoàn toàn chấp nhận được cho demo/học thuật.
 
 ---
 
-## Step 2 — Backend + PostgreSQL trên Railway
+## Bước 1 — PostgreSQL trên Neon (~5 phút)
 
-### 2a. Chuẩn bị
+1. Truy cập [neon.tech](https://neon.tech) → **Sign Up** (dùng GitHub hoặc Google)
+2. **Create Project** → Đặt tên (vd: `ai-asset-management`) → chọn region gần nhất
+3. Neon tự tạo database `neondb`. Vào **Dashboard → Connection Details**
+4. Copy **Connection string** dạng:
+   ```
+   postgresql://username:password@ep-xxx-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+   ```
+5. Lưu lại — đây là `DATABASE_URL` cho Render.
 
-```bash
-# Cài Railway CLI
-npm install -g @railway/cli
+---
 
-# Login
-railway login
-```
+## Bước 2 — Backend (FastAPI) trên Render (~10 phút)
 
-### 2b. Tạo project trên Railway
-
-```bash
-cd /path/to/AI_Management_System/backend
-
-# Init project
-railway init
-
-# Add PostgreSQL add-on (1 lệnh)
-railway add --plugin postgresql
-```
-
-Railway tự tạo biến `DATABASE_URL` và inject vào service.
-
-### 2c. Set environment variables
+### 2a. Đẩy code lên GitHub (nếu chưa có)
 
 ```bash
-railway variables set SECRET_KEY=$(openssl rand -hex 32)
-railway variables set ALGORITHM=HS256
-railway variables set ACCESS_TOKEN_EXPIRE_MINUTES=30
-railway variables set MQTT_BROKER_HOST=xxxxx.s1.eu.hivemq.cloud
-railway variables set MQTT_BROKER_PORT=8883
-railway variables set MQTT_USERNAME=your_mqtt_user
-railway variables set MQTT_PASSWORD=your_mqtt_password
-railway variables set CORS_ORIGINS=https://your-app.vercel.app
-railway variables set FIRST_ADMIN_EMAIL=admin@company.com
-railway variables set FIRST_ADMIN_PASSWORD=admin123!
-# Optional:
-railway variables set OPENAI_API_KEY=sk-...
+# Tại thư mục gốc project
+git add . && git commit -m "chore: prepare for render deployment"
+git push origin main
 ```
 
-### 2d. Deploy backend
+### 2b. Tạo Web Service trên Render
+
+1. Truy cập [render.com](https://render.com) → **Sign Up** → **New → Web Service**
+2. Kết nối với GitHub repo của bạn
+3. Cấu hình:
+
+   | Field | Giá trị |
+   |-------|---------|
+   | **Name** | `ai-asset-management-api` |
+   | **Root Directory** | `backend` |
+   | **Environment** | `Docker` |
+   | **Dockerfile Path** | `./Dockerfile.prod` |
+   | **Instance Type** | `Free` |
+
+### 2c. Set Environment Variables trên Render Dashboard
+
+Tại Web Service → **Environment** → thêm từng biến:
+
+```
+DATABASE_URL          = postgresql://...neon.tech/neondb?sslmode=require
+SECRET_KEY            = <chạy: openssl rand -hex 32>
+ALGORITHM             = HS256
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS   = 7
+MQTT_BROKER_HOST      = broker.emqx.io
+MQTT_BROKER_PORT      = 1883
+CORS_ORIGINS          = https://your-app.vercel.app
+FIRST_ADMIN_EMAIL     = admin@company.com
+FIRST_ADMIN_PASSWORD  = admin123!
+```
+
+> `broker.emqx.io` là MQTT public broker miễn phí — không cần đăng ký, không cần auth, không cần thay đổi code.
+
+### 2d. Deploy và chạy migrations
+
+Render tự build và deploy khi nhấn **Create Web Service**. Sau khi deploy xong (3–5 phút):
 
 ```bash
-# Deploy từ Dockerfile (tự detect)
-railway up
+# Kết nối trực tiếp đến Neon để chạy migrations (1 lần duy nhất)
+# Cài psql hoặc dùng Neon SQL Editor trên dashboard
 
-# Chạy migrations sau khi deploy
-railway run alembic upgrade head
-
-# Seed dữ liệu ban đầu
-railway run python scripts/seed.py
-
-# Train AI model
-railway run python scripts/train_model.py
+# Option A: dùng Render Shell (Dashboard → Web Service → Shell)
+alembic upgrade head
+python scripts/seed.py
+python scripts/train_model.py
 ```
+
+Hoặc dùng **Render Shell** trực tiếp trên web dashboard.
 
 ### 2e. Lấy backend URL
 
-```bash
-railway domain   # → https://your-api.up.railway.app
-```
+Render cấp domain dạng: `https://ai-asset-management-api.onrender.com`
 
 ---
 
-## Step 3 — Frontend trên Vercel
+## Bước 3 — Frontend (Next.js 15) trên Vercel (~5 phút)
 
-### 3a. Cài Vercel CLI và deploy
+### 3a. Deploy qua Vercel CLI
 
 ```bash
-cd /path/to/AI_Management_System/frontend
-
+cd frontend
 npm install -g vercel
-
-# Deploy (lần đầu sẽ hỏi project name, team, etc.)
 vercel
-
-# Nhập khi được hỏi:
-# Project name: ai-asset-management
-# Root directory: ./  (đang ở trong frontend/)
-# Build Command: npm run build
-# Output Directory: .next
 ```
 
-### 3b. Set environment variable cho frontend
+Khi được hỏi:
+- **Project name:** `ai-asset-management`
+- **Root directory:** `./` (đang ở trong `frontend/`)
+- **Build Command:** `npm run build`
+- **Output Directory:** `.next`
+
+### 3b. Set environment variable
 
 ```bash
 vercel env add NEXT_PUBLIC_API_URL
-# Nhập: https://your-api.up.railway.app/api/v1
+# Nhập: https://ai-asset-management-api.onrender.com/api/v1
 # Chọn: Production, Preview, Development
 ```
 
-### 3c. Redeploy với env mới
+### 3c. Redeploy với env
 
 ```bash
 vercel --prod
@@ -125,16 +125,24 @@ vercel --prod
 
 Vercel tạo hostname: `https://ai-asset-management.vercel.app`
 
+### 3d. Cập nhật CORS trên Render
+
+Quay lại Render Dashboard → Web Service → **Environment** → cập nhật:
+```
+CORS_ORIGINS = https://ai-asset-management.vercel.app
+```
+→ **Save Changes** → Render tự redeploy.
+
 ---
 
-## Step 4 — Verify
+## Bước 4 — Verify
 
 ```bash
 # Test API health
-curl https://your-api.up.railway.app/health
+curl https://ai-asset-management-api.onrender.com/api/v1/health
 
 # Test login
-curl -X POST https://your-api.up.railway.app/api/v1/auth/login \
+curl -X POST https://ai-asset-management-api.onrender.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@company.com","password":"admin123!"}'
 ```
@@ -144,27 +152,15 @@ Mở frontend: `https://ai-asset-management.vercel.app`
 
 ---
 
-## Step 5 — Custom Domain (tùy chọn)
+## Bước 5 — Custom Domain (tùy chọn)
 
 ### Vercel
 ```bash
 vercel domains add yourdomain.com
 ```
 
-### Railway
-Railway Dashboard → Settings → Domains → Add custom domain
-
----
-
-## Troubleshooting
-
-| Vấn đề | Giải pháp |
-|--------|-----------|
-| CORS error từ frontend | Đảm bảo `CORS_ORIGINS` có đúng Vercel URL |
-| WebSocket không kết nối | Railway hỗ trợ WS qua HTTPS — URL tự được convert sang `wss://` |
-| SSE bị ngắt | Railway có idle timeout — thêm `KeepAlive` hoặc upgrade plan |
-| MQTT không connect | Kiểm tra port (1883 vs 8883) và credentials |
-| `model.pkl` không tồn tại | Chạy `railway run python scripts/train_model.py` |
+### Render
+Dashboard → Web Service → **Settings → Custom Domains**
 
 ---
 
@@ -172,18 +168,34 @@ Railway Dashboard → Settings → Domains → Add custom domain
 
 | Item | URL |
 |------|-----|
-| Frontend | `https://your-app.vercel.app` |
-| Backend API | `https://your-api.up.railway.app` |
-| API Docs (Swagger) | `https://your-api.up.railway.app/docs` |
-| MQTT Broker | `mqtts://xxxxx.s1.eu.hivemq.cloud:8883` |
+| Frontend | `https://ai-asset-management.vercel.app` |
+| Backend API | `https://ai-asset-management-api.onrender.com` |
+| API Docs (Swagger) | `https://ai-asset-management-api.onrender.com/docs` |
+| MQTT Broker | `mqtt://broker.emqx.io:1883` (public) |
+| Database (Neon) | Xem Neon dashboard |
+
+---
+
+## Troubleshooting
+
+| Vấn đề | Giải pháp |
+|--------|-----------|
+| API trả về 5xx lần đầu | Render đang wake up — đợi 30–50s rồi thử lại |
+| CORS error từ frontend | Kiểm tra `CORS_ORIGINS` khớp đúng URL Vercel (không có trailing slash) |
+| WebSocket không kết nối | Render hỗ trợ WS — URL frontend cần dùng `wss://` thay `ws://` |
+| SSE bị ngắt sớm | Render free có request timeout 30s — xem [docs](https://render.com/docs/free) |
+| MQTT không nhận data | `broker.emqx.io` là public — kiểm tra `MQTT_BROKER_HOST` và port 1883 |
+| `model.pkl` không tồn tại | Render Shell → `python scripts/train_model.py` |
+| Neon connection timeout | Thêm `?sslmode=require&connect_timeout=10` vào DATABASE_URL |
 
 ---
 
 ## Chi phí
 
-| Service | Free Tier |
-|---------|-----------|
-| Vercel | ✅ Free (unlimited projects) |
-| Railway | ✅ $5 free credit/month (~500h runtime) |
-| HiveMQ Cloud | ✅ Free (10 connections, 10GB/month) |
-| **Total** | **$0** |
+| Service | Plan | Hết hạn? |
+|---------|------|----------|
+| Vercel | Free Hobby | ❌ Không bao giờ |
+| Render | Free (750h/tháng) | ❌ Không bao giờ |
+| Neon | Free (512 MB) | ❌ Không bao giờ |
+| broker.emqx.io | Public Free | ❌ Không bao giờ |
+| **Tổng** | **$0** | — |

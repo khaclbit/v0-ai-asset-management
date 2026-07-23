@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: ai-asset-management-api
+    runtime: docker
+    dockerfilePath: backend/Dockerfile.prod
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false           # Set manually in Render dashboard (Neon connection string)
+      - key: SECRET_KEY
+        generateValue: true   # Render auto-generates a random value
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: MQTT_BROKER_HOST
+        value: broker.emqx.io
+      - key: MQTT_BROKER_PORT
+        value: "1883"
+      - key: CORS_ORIGINS
+        sync: false           # Set to your Vercel URL after frontend is deployed
+      - key: FIRST_ADMIN_EMAIL
+        value: admin@company.com
+      - key: FIRST_ADMIN_PASSWORD
+        sync: false           # Set a strong password in Render dashboard
